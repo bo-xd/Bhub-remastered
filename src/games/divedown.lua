@@ -2,7 +2,6 @@ return function(Window, ESP, Library)
     local player = game:GetService("Players").LocalPlayer
     local RunService = game:GetService("RunService")
     local RS = game:GetService("ReplicatedStorage")
-    local Shared = require(RS:WaitForChild("Shared"))
 
     local OceanTab   = Window:AddTab('Ocean')
     local AutofarmTab = Window:AddTab('Autofarm')
@@ -124,45 +123,40 @@ return function(Window, ESP, Library)
     -- ─── Protection / Modifiers ───────────────────────────────────────────────
     local ProtectionGroup = OceanTab:AddRightGroupbox('Protection & Speed')
 
-    -- Anti-Drown: pause the oxygen tween server-side via attribute
+    -- Anti-Drown: the game pauses the oxygen tween when oxygenPaused attr changes to true.
+    -- We must *toggle* it (false → true) each loop to keep triggering AttributeChanged.
     local antiDrownEnabled = false
+    local antiDrownThread = nil
     ProtectionGroup:AddToggle('AntiDrown', { Text = 'Anti Drown', Default = false, Callback = function(v)
         antiDrownEnabled = v
-        pcall(function() player:SetAttribute("oxygenPaused", v) end)
         if v then
-            -- also keep resetting OxygenFill locally
-            task.spawn(function()
+            antiDrownThread = task.spawn(function()
                 while antiDrownEnabled do
                     pcall(function()
+                        player:SetAttribute("oxygenPaused", false)
+                        task.wait(0.05)
                         player:SetAttribute("oxygenPaused", true)
-                        -- If OxygenFill NumberValue exists on client, keep it at 1
-                        local gui = player.PlayerGui:FindFirstChild("PersistentUI", true)
-                        -- Fallback: just keep pausing via attribute every 0.5s
                     end)
                     task.wait(0.5)
                 end
             end)
+        else
+            if antiDrownThread then task.cancel(antiDrownThread); antiDrownThread = nil end
+            pcall(function() player:SetAttribute("oxygenPaused", false) end)
         end
     end })
 
-    -- Swim Speed via AdminSpeedMultiplier (client-side attr, read by the swim LocalScript)
+    -- Swim Speed: AdminSpeedMultiplier is read every frame by the game's swim LocalScript.
+    -- Setting it on workspace (client-side) is sufficient since both scripts run on the same client.
     local swimSpeedVal = 1
     ProtectionGroup:AddSlider('SwimSpeed', { Text = 'Swim Speed Multiplier', Min = 1, Max = 20, Default = 1, Rounding = 1, Callback = function(v)
         swimSpeedVal = v
         pcall(function() workspace:SetAttribute("AdminSpeedMultiplier", v) end)
     end })
-    -- Re-apply on respawn
     player.CharacterAdded:Connect(function()
         task.wait(1)
         pcall(function() workspace:SetAttribute("AdminSpeedMultiplier", swimSpeedVal) end)
     end)
-
-    -- Boost Always On: fire the hasBoost signal directly (from decompiled Shared signal system)
-    local boostEnabled = false
-    ProtectionGroup:AddToggle('BoostAlwaysOn', { Text = 'Always Boosted (1.5x)', Default = false, Callback = function(v)
-        boostEnabled = v
-        pcall(function() Shared.Signal.Fire("hasBoost", v) end)
-    end })
 
     -- Reach
     local reachEnabled = false
@@ -280,7 +274,6 @@ return function(Window, ESP, Library)
         task.spawn(function()
             local root = f:FindFirstChild("RootPart") or f:WaitForChild("RootPart", 5)
             if root and fishEspEnabled then
-                ESP.Enabled = true -- temporarily unlock so Add works
                 ESP:Add(f, { Name=label, PrimaryPart=root, Color=fishColor(mut,rar), IsEnabled=function() return fishEspEnabled and f.Parent==Fish end })
             end
         end)
@@ -319,7 +312,7 @@ return function(Window, ESP, Library)
         else
             for _, m in pairs(Markers:GetChildren()) do
                 if not ESP.Objects[m] then
-                    pcall(function() ESP.Enabled=true; ESP:Add(m, { Name="[Zone] "..m.Name, Color=Color3.fromRGB(0,150,255), TextOnly=true, IsEnabled=function() return areaEspEnabled end }) end)
+                    pcall(function() ESP:Add(m, { Name="[Zone] "..m.Name, Color=Color3.fromRGB(0,150,255), TextOnly=true, IsEnabled=function() return areaEspEnabled end }) end)
                 end
             end
         end
@@ -329,7 +322,7 @@ return function(Window, ESP, Library)
     Markers.ChildAdded:Connect(function(m)
         task.wait(0.5)
         if areaEspEnabled and not ESP.Objects[m] then
-            pcall(function() ESP.Enabled=true; ESP:Add(m, { Name="[Zone] "..m.Name, Color=Color3.fromRGB(0,150,255), TextOnly=true, IsEnabled=function() return areaEspEnabled end }) end)
+            pcall(function() ESP:Add(m, { Name="[Zone] "..m.Name, Color=Color3.fromRGB(0,150,255), TextOnly=true, IsEnabled=function() return areaEspEnabled end }) end)
         end
     end)
     Markers.ChildRemoved:Connect(function(m)

@@ -85,11 +85,6 @@ function ESP:Clear()
 end
 
 function ESP:Update()
-	if not self.Enabled then
-		for _, data in pairs(self.Objects) do hideAll(data.Components) end
-		return
-	end
-
 	local cam = workspace.CurrentCamera
 	if not cam then return end
 
@@ -98,10 +93,13 @@ function ESP:Update()
 
 	for _, data in pairs(self.Objects) do
 		local part = data.PrimaryPart
+		-- Objects with a custom IsEnabled callback are independent of ESP.Enabled
+		-- Objects without one (e.g. player ESP) require the global ESP.Enabled flag
+		local globalOk = data.IsEnabled ~= nil or self.Enabled
 		local c    = data.Components
 
 		-- Validity & custom toggle check
-		if not part or not part.Parent or (data.IsEnabled and not data.IsEnabled()) then
+		if not globalOk or not part or not part.Parent or (data.IsEnabled and not data.IsEnabled()) then
 			hideAll(c); continue
 		end
 
