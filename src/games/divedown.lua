@@ -159,10 +159,12 @@ return function(Window, ESP, Library)
                             local m, r = getFishData(v)
                             if checkFilters(m, r, mFilters, rFilters) then
                                 local p = v:FindFirstChildOfClass("ProximityPrompt", true)
-                                if p then
-                                    p.HoldDuration = 0; p.MaxActivationDistance = 9e9
-                                    player.Character:PivotTo(v:GetPivot() * CFrame.new(0, 3, 0))
-                                    task.wait(0.1); if autofarmEnabled then fireproximityprompt(p) end; task.wait(0.2)
+                                if p and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                                    p.HoldDuration = 0; p.MaxActivationDistance = 9e9; p.Enabled = true
+                                    player.Character.HumanoidRootPart.CFrame = v:GetPivot() * CFrame.new(0, 3, 0)
+                                    task.wait(0.2)
+                                    if autofarmEnabled then fireproximityprompt(p) end
+                                    task.wait(0.2)
                                 end
                             end
                         end
@@ -206,16 +208,18 @@ return function(Window, ESP, Library)
     local MiscUtils = MiscTab:AddLeftGroupbox('Utilities')
     local TimerLabel = MiscUtils:AddLabel('Timers Loading...')
     task.spawn(function()
-        pcall(function()
-            local BloopSched = require(RS.Modules.BloopSpawnSchedule)
-            local MermaidSched = require(RS.Modules.MermaidSpawnSchedule)
-            while true do
-                task.wait(1)
-                local bT = math.max(0, math.floor(BloopSched.NextSpawn - os.time()))
-                local mT = math.max(0, math.floor(MermaidSched.NextSpawn - os.time()))
+        local function getVal(m) if not m then return 0 end return m.NextSpawn or m.SpawnTime or m.Time or m.time or 0 end
+        while true do
+            task.wait(1)
+            local bMod = RS.Modules:FindFirstChild("BloopSpawnSchedule")
+            local mMod = RS.Modules:FindFirstChild("MermaidSpawnSchedule")
+            if bMod and mMod then
+                local bS = require(bMod); local mS = require(mMod)
+                local bT = math.max(0, math.floor(getVal(bS) - os.time()))
+                local mT = math.max(0, math.floor(getVal(mS) - os.time()))
                 TimerLabel:SetText(string.format("Bloop: %ds | Mermaid: %ds", bT, mT))
-            end
-        end)
+            else TimerLabel:SetText("Searching for Schedule Modules...") end
+        end
     end)
 
     local ValueLabel = MiscUtils:AddLabel('Backpack Value: $0')
@@ -225,11 +229,8 @@ return function(Window, ESP, Library)
             task.wait(1)
             local total = 0
             local bf = player:FindFirstChild("BackpackFish")
-            if bf then
-                for _, f in pairs(bf:GetChildren()) do total = total + (Earnings[f.Name] or 0) end
-            else
-                for _, f in pairs(player:GetAttribute("BackpackFish") or {}) do total = total + (Earnings[f] or 0) end
-            end
+            if bf then for _, f in pairs(bf:GetChildren()) do total = total + (Earnings[f.Name] or 0) end
+            else for _, f in pairs(player:GetAttribute("BackpackFish") or {}) do total = total + (Earnings[f] or 0) end end
             ValueLabel:SetText("Backpack Value: $" .. total)
         end
     end)
@@ -243,21 +244,30 @@ return function(Window, ESP, Library)
     local ShopGroup = MiscTab:AddRightGroupbox('Auto Shop')
     ShopGroup:AddToggle('AutoTreats', { Text = 'Auto Buy Treats', Default = false, Callback = function(v) autoShopTreats = v end })
     ShopGroup:AddToggle('AutoTools', { Text = 'Auto Buy Tools', Default = false, Callback = function(v) autoShopTools = v end })
-    task.spawn(function() while true do task.wait(5); if autoShopTreats then pcall(function() require(player.PlayerScripts.Client).Network.Invoke("BuyItem", "Treats", "Super Treat") end) end; if autoShopTools then pcall(function() require(player.PlayerScripts.Client).Network.Invoke("BuyItem", "Tools", "Master Tool") end) end end end)
+    
+    task.spawn(function()
+        local Client = player.PlayerScripts:WaitForChild("Client")
+        local Net = require(Client).Network
+        while true do
+            task.wait(5)
+            if autoShopTreats then pcall(function() Net.Invoke("BuyItem", "Treats", "Super Treat") end) end
+            if autoShopTools then pcall(function() Net.Invoke("BuyItem", "Tools", "Master Tool") end) end
+        end
+    end)
 
     local autoUpgradeEnabled = false
     MiscTab:AddRightGroupbox('Progression'):AddToggle('AutoUpgrade', { Text = 'Auto-Upgrade Gear', Default = false, Callback = function(v) autoUpgradeEnabled = v end })
     task.spawn(function()
         local Gear = require(RS.Modules.GearConfig)
+        local Client = player.PlayerScripts:WaitForChild("Client")
+        local Net = require(Client).Network
         while true do
             task.wait(5)
             if autoUpgradeEnabled then
                 local cash = player:GetAttribute("Cash") or 0
                 for cat, items in pairs(Gear) do
                     for itemName, data in pairs(items) do
-                        if data.price and data.price <= cash then
-                            pcall(function() require(player.PlayerScripts.Client).Network.Invoke("BuyItem", cat, itemName) end)
-                        end
+                        if data.price and data.price <= cash then pcall(function() Net.Invoke("BuyItem", cat, itemName) end) end
                     end
                 end
             end
