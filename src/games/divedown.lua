@@ -263,7 +263,7 @@ return function(Window, ESP)
                 if markers then
                     for _, m in pairs(markers:GetChildren()) do
                         if not (ESP.Objects and ESP.Objects[m]) then
-                            pcall(function() ESP:Add(m, { Name = "[Zone] "..m.Name, Color = Color3.fromRGB(0,150,255), IsEnabled = function() return areaEspEnabled end }) end)
+                            pcall(function() ESP:Add(m, { Name = "[Zone] "..m.Name, Color = Color3.fromRGB(0,150,255), TextOnly = true, IsEnabled = function() return areaEspEnabled end }) end)
                         end
                     end
                 end

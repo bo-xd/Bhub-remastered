@@ -52,6 +52,7 @@ function ESP:Add(object, options)
 		PrimaryPart = primaryPart,
 		Name = options.Name or object.Name,
 		Color = options.Color,
+		TextOnly = options.TextOnly or false,
 		Size = options.Size or (object:IsA("Model") and select(2, object:GetBoundingBox())) or (object:IsA("BasePart") and object.Size) or Vector3.new(4, 5, 0),
 		IsEnabled = options.IsEnabled,
         
@@ -99,15 +100,6 @@ function ESP:Clear()
 end
 
 function ESP:Update()
-	if not self.Enabled then
-		for _, espData in pairs(self.Objects) do
-			for _, component in pairs(espData.Components) do
-				component.Visible = false
-			end
-		end
-		return
-	end
-
 	local localChar = LocalPlayer.Character
 	local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
 
@@ -139,77 +131,100 @@ function ESP:Update()
 			local y = topPos.Y
 			
 			local color = espData.Color or self.BoxColor
-			local textColor = self.TextColor
+			local textColor = espData.Color or self.TextColor
 			
-			if self.ShowBoxes then
-				espData.Components.BoxOutline.Visible = true
-				espData.Components.BoxOutline.Size = Vector2.new(width, height)
-				espData.Components.BoxOutline.Position = Vector2.new(x, y)
-				
-				espData.Components.Box.Visible = true
-				espData.Components.Box.Size = Vector2.new(width, height)
-				espData.Components.Box.Position = Vector2.new(x, y)
-				espData.Components.Box.Color = color
-			else
+			if espData.TextOnly then
 				espData.Components.BoxOutline.Visible = false
 				espData.Components.Box.Visible = false
-			end
-			
-			local humanoid = object:FindFirstChildOfClass("Humanoid")
-			if self.ShowHealth and humanoid then
-				local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-				local barHeight = height * healthPercent
-				local barColor = Color3.fromHSV(healthPercent * 0.3, 1, 1) 
-				
-				espData.Components.HealthBarOutline.Visible = true
-				espData.Components.HealthBarOutline.Size = Vector2.new(2, height)
-				espData.Components.HealthBarOutline.Position = Vector2.new(x - 5, y)
-				
-				espData.Components.HealthBar.Visible = true
-				espData.Components.HealthBar.Size = Vector2.new(2, barHeight)
-				espData.Components.HealthBar.Position = Vector2.new(x - 5, y + (height - barHeight))
-				espData.Components.HealthBar.Color = barColor
-			else
 				espData.Components.HealthBarOutline.Visible = false
 				espData.Components.HealthBar.Visible = false
-			end
-			
-			if self.ShowNames then
+				espData.Components.Tracer.Visible = false
+				
 				espData.Components.Name.Visible = true
 				espData.Components.Name.Text = espData.Name
-				espData.Components.Name.Position = Vector2.new(x + width/2, y - self.TextSize - 2)
+				espData.Components.Name.Position = Vector2.new(topPos.X, topPos.Y)
 				espData.Components.Name.Color = textColor
-			else
-				espData.Components.Name.Visible = false
-			end
-			
-			if self.ShowDistance and localRoot then
-				local dist = (localRoot.Position - espData.PrimaryPart.Position).Magnitude
-				espData.Components.Distance.Visible = true
-				espData.Components.Distance.Text = string.format("%d studs", dist)
-				espData.Components.Distance.Position = Vector2.new(x + width/2, y + height + 2)
-				espData.Components.Distance.Color = textColor
-			else
-				espData.Components.Distance.Visible = false
-			end
-			
-			if self.ShowTracers then
-				local origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
 				
-				if self.TracerOrigin == "Top" then
-					origin = Vector2.new(Camera.ViewportSize.X / 2, 0)
-				elseif self.TracerOrigin == "Middle" then
-					origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-				elseif self.TracerOrigin == "Mouse" then
-					origin = game:GetService("UserInputService"):GetMouseLocation()
+				if localRoot then
+					local dist = math.floor((localRoot.Position - espData.PrimaryPart.Position).Magnitude)
+					espData.Components.Distance.Visible = true
+					espData.Components.Distance.Text = string.format("%d studs", dist)
+					espData.Components.Distance.Position = Vector2.new(topPos.X, topPos.Y + self.TextSize + 2)
+					espData.Components.Distance.Color = textColor
+				else
+					espData.Components.Distance.Visible = false
 				end
-
-				espData.Components.Tracer.Visible = true
-				espData.Components.Tracer.From = origin
-				espData.Components.Tracer.To = Vector2.new(x + width/2, y + height)
-				espData.Components.Tracer.Color = self.TracerColor
 			else
-				espData.Components.Tracer.Visible = false
+				if self.ShowBoxes then
+					espData.Components.BoxOutline.Visible = true
+					espData.Components.BoxOutline.Size = Vector2.new(width, height)
+					espData.Components.BoxOutline.Position = Vector2.new(x, y)
+					
+					espData.Components.Box.Visible = true
+					espData.Components.Box.Size = Vector2.new(width, height)
+					espData.Components.Box.Position = Vector2.new(x, y)
+					espData.Components.Box.Color = color
+				else
+					espData.Components.BoxOutline.Visible = false
+					espData.Components.Box.Visible = false
+				end
+				
+				local humanoid = object:FindFirstChildOfClass("Humanoid")
+				if self.ShowHealth and humanoid then
+					local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+					local barHeight = height * healthPercent
+					local barColor = Color3.fromHSV(healthPercent * 0.3, 1, 1) 
+					
+					espData.Components.HealthBarOutline.Visible = true
+					espData.Components.HealthBarOutline.Size = Vector2.new(2, height)
+					espData.Components.HealthBarOutline.Position = Vector2.new(x - 5, y)
+					
+					espData.Components.HealthBar.Visible = true
+					espData.Components.HealthBar.Size = Vector2.new(2, barHeight)
+					espData.Components.HealthBar.Position = Vector2.new(x - 5, y + (height - barHeight))
+					espData.Components.HealthBar.Color = barColor
+				else
+					espData.Components.HealthBarOutline.Visible = false
+					espData.Components.HealthBar.Visible = false
+				end
+				
+				if self.ShowNames then
+					espData.Components.Name.Visible = true
+					espData.Components.Name.Text = espData.Name
+					espData.Components.Name.Position = Vector2.new(x + width/2, y - self.TextSize - 2)
+					espData.Components.Name.Color = textColor
+				else
+					espData.Components.Name.Visible = false
+				end
+				
+				if self.ShowDistance and localRoot then
+					local dist = (localRoot.Position - espData.PrimaryPart.Position).Magnitude
+					espData.Components.Distance.Visible = true
+					espData.Components.Distance.Text = string.format("%d studs", dist)
+					espData.Components.Distance.Position = Vector2.new(x + width/2, y + height + 2)
+					espData.Components.Distance.Color = textColor
+				else
+					espData.Components.Distance.Visible = false
+				end
+				
+				if self.ShowTracers then
+					local origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+					
+					if self.TracerOrigin == "Top" then
+						origin = Vector2.new(Camera.ViewportSize.X / 2, 0)
+					elseif self.TracerOrigin == "Middle" then
+						origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+					elseif self.TracerOrigin == "Mouse" then
+						origin = game:GetService("UserInputService"):GetMouseLocation()
+					end
+	
+					espData.Components.Tracer.Visible = true
+					espData.Components.Tracer.From = origin
+					espData.Components.Tracer.To = Vector2.new(x + width/2, y + height)
+					espData.Components.Tracer.Color = self.TracerColor
+				else
+					espData.Components.Tracer.Visible = false
+				end
 			end
 		else
 			for _, component in pairs(espData.Components) do
