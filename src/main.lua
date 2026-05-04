@@ -24,7 +24,6 @@ local REPO = "bo-xd/Bhub-remastered"
 local BRANCH = "main"
 
 local function loadFile(path)
-    -- Try local first (dev mode)
     if isfile and readfile then
         local localPath = "Bhub-remastered/" .. path
         if isfile(localPath) then
@@ -35,9 +34,8 @@ local function loadFile(path)
         end
     end
 
-    -- Fallback to Private GitHub
     local url = string.format("https://raw.githubusercontent.com/%s/%s/%s", REPO, BRANCH, path)
-    local req = http.request
+    local req = (syn and syn.request) or (http and http.request) or http_request or request
     
     if req then
         local response = req({
@@ -116,7 +114,9 @@ LeftGroupBox:AddToggle('EspHealth', {
     end
 })
 
-LeftGroupBox:AddToggle('EspTracers', {
+local TracerGroupBox = Tabs.Main:AddRightGroupbox('Tracer Settings')
+
+TracerGroupBox:AddToggle('EspTracers', {
     Text = 'Show Tracers',
     Default = false,
     Callback = function(Value)
@@ -130,9 +130,9 @@ LeftGroupBox:AddToggle('EspTracers', {
     end
 })
 
-LeftGroupBox:AddDropdown('TracerOrigin', {
+TracerGroupBox:AddDropdown('TracerOrigin', {
     Values = { 'Top', 'Middle', 'Bottom', 'Mouse' },
-    Default = 3, -- Bottom
+    Default = 3,
     Multi = false,
     Text = 'Tracer Position',
     Callback = function(Value)
@@ -140,40 +140,46 @@ LeftGroupBox:AddDropdown('TracerOrigin', {
     end
 })
 
--- Setup the Bots
-local function setupBot(bot)
-    if bot:IsA("Model") then
-        ESP:Add(bot, {
-            Name = bot.Name,
-            -- We don't need to specify color here if we want it to dynamically follow the ESP.BoxColor
-            -- However, if you want each bot to have a fixed color, you can set `Color = Color3.fromRGB(255, 0, 0)`
-            IsEnabled = function() 
-                -- Example check: Only show if the bot is alive
-                local hum = bot:FindFirstChild("Humanoid")
-                return hum and hum.Health > 0 or not hum
+local function setupPlayer(plr)
+    plr.CharacterAdded:Connect(function(char)
+        task.delay(0.5, function()
+            ESP:Add(char, {
+                Name = plr.Name,
+                Player = plr,
+                IsEnabled = function()
+                    return plr.Character == char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0
+                end
+            })
+        end)
+    end)
+    
+    if plr.Character then
+        ESP:Add(plr.Character, {
+            Name = plr.Name,
+            Player = plr,
+            IsEnabled = function()
+                return plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0
             end
         })
     end
 end
 
--- Initialize existing bots in workspace.Bots
-if workspace:FindFirstChild("Bots") then
-    for _, bot in ipairs(workspace.Bots:GetChildren()) do
-        setupBot(bot)
+for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
+    if plr ~= game:GetService("Players").LocalPlayer then
+        setupPlayer(plr)
     end
-    
-    -- Listen for new bots added to the folder
-    workspace.Bots.ChildAdded:Connect(function(child)
-        -- Short yield to ensure the bot's parts are fully loaded
-        task.delay(0.1, function()
-            setupBot(child)
-        end)
-    end)
-else
-    warn("Could not find workspace.Bots!")
 end
 
--- UI Settings logic
+game:GetService("Players").PlayerAdded:Connect(function(plr)
+    setupPlayer(plr)
+end)
+
+game:GetService("Players").PlayerRemoving:Connect(function(plr)
+    if plr.Character then
+        ESP:Remove(plr.Character)
+    end
+end)
+
 local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
 MenuGroup:AddButton('Unload', function() 
     ESP:Unload()

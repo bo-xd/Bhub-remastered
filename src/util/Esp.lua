@@ -12,8 +12,8 @@ local ESP = {
     
 	Thickness = 1,
 	TextSize = 13,
-	TextFont = 2, -- Drawing.Fonts.UI
-    TracerOrigin = "Bottom", -- "Top", "Middle", "Bottom", "Mouse"
+	TextFont = 2,
+    TracerOrigin = "Bottom",
     
 	Objects = {},
 	Connections = {}
@@ -127,20 +127,20 @@ function ESP:Update()
 		local cf = espData.PrimaryPart.CFrame
 		local size = espData.Size
 		
-		-- Use a more standard 2D box projection
-		local topPos, onScreenTop = Camera:WorldToViewportPoint((cf * CFrame.new(0, size.Y/2, 0)).Position)
-		local bottomPos, onScreenBottom = Camera:WorldToViewportPoint((cf * CFrame.new(0, -size.Y/2, 0)).Position)
+		local rootPos = espData.PrimaryPart.Position
+		
+		local topPos, onScreenTop = Camera:WorldToViewportPoint(rootPos + Vector3.new(0, 3, 0))
+		local bottomPos, onScreenBottom = Camera:WorldToViewportPoint(rootPos - Vector3.new(0, 3, 0))
 		
 		if onScreenTop or onScreenBottom then
 			local height = math.abs(topPos.Y - bottomPos.Y)
-			local width = height * 0.6
+			local width = height * 0.7 
 			local x = topPos.X - width/2
 			local y = topPos.Y
 			
 			local color = espData.Color or self.BoxColor
 			local textColor = self.TextColor
 			
-			-- Box
 			if self.ShowBoxes then
 				espData.Components.BoxOutline.Visible = true
 				espData.Components.BoxOutline.Size = Vector2.new(width, height)
@@ -155,12 +155,11 @@ function ESP:Update()
 				espData.Components.Box.Visible = false
 			end
 			
-			-- Health Bar
 			local humanoid = object:FindFirstChildOfClass("Humanoid")
 			if self.ShowHealth and humanoid then
 				local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
 				local barHeight = height * healthPercent
-				local barColor = Color3.fromHSV(healthPercent * 0.3, 1, 1) -- Red to Green
+				local barColor = Color3.fromHSV(healthPercent * 0.3, 1, 1) 
 				
 				espData.Components.HealthBarOutline.Visible = true
 				espData.Components.HealthBarOutline.Size = Vector2.new(2, height)
@@ -175,7 +174,6 @@ function ESP:Update()
 				espData.Components.HealthBar.Visible = false
 			end
 			
-			-- Name
 			if self.ShowNames then
 				espData.Components.Name.Visible = true
 				espData.Components.Name.Text = espData.Name
@@ -185,7 +183,6 @@ function ESP:Update()
 				espData.Components.Name.Visible = false
 			end
 			
-			-- Distance
 			if self.ShowDistance and localRoot then
 				local dist = (localRoot.Position - espData.PrimaryPart.Position).Magnitude
 				espData.Components.Distance.Visible = true
@@ -196,9 +193,8 @@ function ESP:Update()
 				espData.Components.Distance.Visible = false
 			end
 			
-			-- Tracer
 			if self.ShowTracers then
-				local origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y) -- Bottom default
+				local origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
 				
 				if self.TracerOrigin == "Top" then
 					origin = Vector2.new(Camera.ViewportSize.X / 2, 0)
