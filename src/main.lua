@@ -37,7 +37,7 @@ local function loadFile(path)
 
     -- Fallback to Private GitHub
     local url = string.format("https://raw.githubusercontent.com/%s/%s/%s", REPO, BRANCH, path)
-    local req = (syn and syn.request) or (http and http.request) or http_request or request
+    local req = http.request
     
     if req then
         local response = req({
@@ -78,6 +78,12 @@ LeftGroupBox:AddToggle('EspBoxes', {
     Callback = function(Value)
         ESP.ShowBoxes = Value
     end
+}):AddColorPicker('BoxColorPicker', {
+    Default = Color3.fromRGB(255, 255, 255),
+    Title = 'Box Color',
+    Callback = function(Value)
+        ESP.BoxColor = Value
+    end
 })
 
 LeftGroupBox:AddToggle('EspNames', {
@@ -85,6 +91,12 @@ LeftGroupBox:AddToggle('EspNames', {
     Default = true,
     Callback = function(Value)
         ESP.ShowNames = Value
+    end
+}):AddColorPicker('TextColorPicker', {
+    Default = Color3.fromRGB(255, 255, 255),
+    Title = 'Text Color',
+    Callback = function(Value)
+        ESP.TextColor = Value
     end
 })
 
@@ -96,14 +108,6 @@ LeftGroupBox:AddToggle('EspDistance', {
     end
 })
 
-LeftGroupBox:AddToggle('EspTracers', {
-    Text = 'Show Tracers',
-    Default = false,
-    Callback = function(Value)
-        ESP.ShowTracers = Value
-    end
-})
-
 LeftGroupBox:AddToggle('EspHealth', {
     Text = 'Show Health Bar',
     Default = true,
@@ -112,19 +116,27 @@ LeftGroupBox:AddToggle('EspHealth', {
     end
 })
 
-LeftGroupBox:AddLabel('Box Color'):AddColorPicker('BoxColorPicker', {
-    Default = Color3.fromRGB(255, 0, 0), -- Default red for bots
-    Title = 'Box Color',
+LeftGroupBox:AddToggle('EspTracers', {
+    Text = 'Show Tracers',
+    Default = false,
     Callback = function(Value)
-        ESP.BoxColor = Value
+        ESP.ShowTracers = Value
+    end
+}):AddColorPicker('TracerColorPicker', {
+    Default = Color3.fromRGB(255, 255, 255),
+    Title = 'Tracer Color',
+    Callback = function(Value)
+        ESP.TracerColor = Value
     end
 })
 
-LeftGroupBox:AddLabel('Text Color'):AddColorPicker('TextColorPicker', {
-    Default = Color3.fromRGB(255, 255, 255),
-    Title = 'Text Color',
+LeftGroupBox:AddDropdown('TracerOrigin', {
+    Values = { 'Top', 'Middle', 'Bottom', 'Mouse' },
+    Default = 3, -- Bottom
+    Multi = false,
+    Text = 'Tracer Position',
     Callback = function(Value)
-        ESP.TextColor = Value
+        ESP.TracerOrigin = Value
     end
 })
 

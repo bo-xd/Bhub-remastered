@@ -13,6 +13,7 @@ local ESP = {
 	Thickness = 1,
 	TextSize = 13,
 	TextFont = 2, -- Drawing.Fonts.UI
+    TracerOrigin = "Bottom", -- "Top", "Middle", "Bottom", "Mouse"
     
 	Objects = {},
 	Connections = {}
@@ -197,8 +198,18 @@ function ESP:Update()
 			
 			-- Tracer
 			if self.ShowTracers then
+				local origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y) -- Bottom default
+				
+				if self.TracerOrigin == "Top" then
+					origin = Vector2.new(Camera.ViewportSize.X / 2, 0)
+				elseif self.TracerOrigin == "Middle" then
+					origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+				elseif self.TracerOrigin == "Mouse" then
+					origin = game:GetService("UserInputService"):GetMouseLocation()
+				end
+
 				espData.Components.Tracer.Visible = true
-				espData.Components.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+				espData.Components.Tracer.From = origin
 				espData.Components.Tracer.To = Vector2.new(x + width/2, y + height)
 				espData.Components.Tracer.Color = self.TracerColor
 			else
