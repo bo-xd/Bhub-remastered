@@ -117,3 +117,12 @@ SaveManager:SetFolder('BHubRemastered/Games')
 SaveManager:BuildConfigSection(Tabs['UI Settings'])
 ThemeManager:ApplyToTab(Tabs['UI Settings'])
 SaveManager:LoadAutoloadConfig()
+
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        if ESP then
+            ESP.MenuOpen = Library.Visible
+        end
+    end
+end)

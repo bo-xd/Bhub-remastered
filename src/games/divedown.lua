@@ -341,13 +341,18 @@ return function(Window, ESP, Library)
                         if not enabled then break end
                         if not item:IsA("Frame") or item.Name == "UIListLayout" then continue end
                         local slot = item:FindFirstChild("SlotTemplate")
-                        local stockTxt = slot and slot:FindFirstChild("StockAmount") and slot.StockAmount.Text or "0"
-                        local stock = tonumber(string.match(stockTxt, "%d+")) or 0
-                        if stock > 0 then
-                            for i = 1, stock do 
-                                if not enabled then break end 
-                                fireBuy(shopName, item.Name) 
-                                task.wait(0.15) 
+                        local stockLabel = slot and slot:FindFirstChild("StockAmount")
+                        if stockLabel then
+                            local stockTxt = stockLabel.Text:upper()
+                            if not stockTxt:find("NO STOCK") then
+                                local stock = tonumber(string.match(stockTxt, "%d+")) or 0
+                                if stock > 0 then
+                                    for i = 1, stock do 
+                                        if not enabled then break end 
+                                        fireBuy(shopName, item.Name) 
+                                        task.wait(0.15) 
+                                    end
+                                end
                             end
                         end
                     end

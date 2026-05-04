@@ -6,6 +6,9 @@ local ESP = {
 	ShowHealth = true,
 	ShowTracers = false,
     
+    MenuOpen = false,
+    HideWhenMenuOpen = true,
+    
 	BoxColor = Color3.fromRGB(255, 255, 255),
 	TextColor = Color3.fromRGB(255, 255, 255),
 	TracerColor = Color3.fromRGB(255, 255, 255),
@@ -105,10 +108,14 @@ function ESP:Update()
 	local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
 
 	for object, espData in pairs(self.Objects) do
-		local shouldRender = true
+		local shouldRender = self.Enabled
 		if espData.IsEnabled and not espData.IsEnabled() then
 			shouldRender = false
 		end
+        
+        if self.HideWhenMenuOpen and self.MenuOpen then
+            shouldRender = false
+        end
 
 		if not shouldRender or not espData.PrimaryPart or not espData.PrimaryPart.Parent then
 			for _, component in pairs(espData.Components) do
@@ -138,12 +145,14 @@ function ESP:Update()
 				espData.Components.Name.Position = Vector2.new(topPos.X, topPos.Y)
 				espData.Components.Name.Color = textColor
 				
-				if localRoot then
+				if self.ShowDistance and localRoot then
 					local dist = math.floor((localRoot.Position - espData.PrimaryPart.Position).Magnitude)
 					espData.Components.Distance.Visible = true
-					espData.Components.Distance.Text = string.format("%d studs", dist)
+					espData.Components.Distance.Text = string.format("[%d studs]", dist)
 					espData.Components.Distance.Position = Vector2.new(topPos.X, topPos.Y + self.TextSize + 2)
 					espData.Components.Distance.Color = textColor
+                else
+                    espData.Components.Distance.Visible = false
 				end
 			else
 				if self.ShowBoxes then
@@ -191,7 +200,7 @@ function ESP:Update()
 				if self.ShowDistance and localRoot then
 					local dist = (localRoot.Position - espData.PrimaryPart.Position).Magnitude
 					espData.Components.Distance.Visible = true
-					espData.Components.Distance.Text = string.format("%d studs", dist)
+					espData.Components.Distance.Text = string.format("[%d studs]", math.floor(dist))
 					espData.Components.Distance.Position = Vector2.new(x + width/2, y + height + 2)
 					espData.Components.Distance.Color = textColor
 				else
