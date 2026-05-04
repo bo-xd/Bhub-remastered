@@ -1,254 +1,200 @@
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
 local ESP = {
 	Enabled = false,
 	ShowBoxes = true,
 	ShowNames = true,
 	ShowDistance = true,
 	ShowHealth = true,
-	ShowTracers = false,
-    
-    MenuOpen = false,
-    HideWhenMenuOpen = true,
-    
 	BoxColor = Color3.fromRGB(255, 255, 255),
 	TextColor = Color3.fromRGB(255, 255, 255),
-	TracerColor = Color3.fromRGB(255, 255, 255),
-    
-	Thickness = 1,
 	TextSize = 13,
 	TextFont = 2,
-    TracerOrigin = "Bottom",
-    
+	MaxDistance = 400,
 	Objects = {},
-	Connections = {}
+	_conn = nil
 }
 
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
-local function CreateDrawing(class, properties)
-	local drawing = Drawing.new(class)
-	for i, v in pairs(properties) do
-		drawing[i] = v
+local function newDrawing(class, props)
+	local d = Drawing.new(class)
+	for k, v in pairs(props) do d[k] = v end
+	return d
+end
+
+local function hideAll(components)
+	for _, c in pairs(components) do
+		c.Visible = false
 	end
-	return drawing
 end
 
 function ESP:Add(object, options)
-	options = options or {}
-	
-	if self.Objects[object] then
-		self:Remove(object)
-	end
-	
-	local primaryPart = options.PrimaryPart or (object:IsA("Model") and (object.PrimaryPart or object:FindFirstChild("HumanoidRootPart"))) or (object:IsA("BasePart") and object)
-	
-	if not primaryPart then
-		return nil
-	end
+	if self.Objects[object] then self:Remove(object) end
 
-	local espData = {
-		Object = object,
-		PrimaryPart = primaryPart,
-		Name = options.Name or object.Name,
-		Color = options.Color,
-		TextOnly = options.TextOnly or false,
-		Size = options.Size or (object:IsA("Model") and select(2, object:GetBoundingBox())) or (object:IsA("BasePart") and object.Size) or Vector3.new(4, 5, 0),
-		IsEnabled = options.IsEnabled,
-        
-		Components = {
-			BoxOutline = CreateDrawing("Square", { Thickness = 3, Color = Color3.new(0,0,0), Transparency = 1, Filled = false, Visible = false }),
-			Box = CreateDrawing("Square", { Thickness = 1, Color = options.Color or self.BoxColor, Transparency = 1, Filled = false, Visible = false }),
-			
-			HealthBarOutline = CreateDrawing("Square", { Thickness = 1, Color = Color3.new(0,0,0), Transparency = 1, Filled = true, Visible = false }),
-			HealthBar = CreateDrawing("Square", { Thickness = 1, Color = Color3.new(0,1,0), Transparency = 1, Filled = true, Visible = false }),
+	local primaryPart =
+		(options and options.PrimaryPart) or
+		(object:IsA("Model") and (object.PrimaryPart or object:FindFirstChildWhichIsA("BasePart", true))) or
+		(object:IsA("BasePart") and object)
 
-			Name = CreateDrawing("Text", { Text = options.Name or object.Name, Color = options.Color or self.TextColor, Center = true, Outline = true, Size = self.TextSize, Font = self.TextFont, Visible = false }),
-			Distance = CreateDrawing("Text", { Text = "", Color = options.Color or self.TextColor, Center = true, Outline = true, Size = self.TextSize, Font = self.TextFont, Visible = false }),
-			Tracer = CreateDrawing("Line", { Thickness = 1, Color = options.Color or self.TracerColor, Transparency = 1, Visible = false })
-		}
+	if not primaryPart then return end
+
+	local color = (options and options.Color) or self.BoxColor
+	local name  = (options and options.Name)  or object.Name
+
+	local c = {
+		BoxOut  = newDrawing("Square", { Thickness=3, Color=Color3.new(0,0,0), Transparency=1, Filled=false, Visible=false }),
+		Box     = newDrawing("Square", { Thickness=1, Color=color, Transparency=1, Filled=false, Visible=false }),
+		HpOut   = newDrawing("Square", { Thickness=1, Color=Color3.new(0,0,0), Transparency=1, Filled=true,  Visible=false }),
+		Hp      = newDrawing("Square", { Thickness=1, Color=Color3.fromRGB(0,200,0), Transparency=1, Filled=true,  Visible=false }),
+		Name    = newDrawing("Text",   { Text=name,  Color=color, Center=true, Outline=true, Size=self.TextSize, Font=self.TextFont, Visible=false }),
+		Dist    = newDrawing("Text",   { Text="",    Color=color, Center=true, Outline=true, Size=self.TextSize, Font=self.TextFont, Visible=false }),
 	}
-	
-	self.Objects[object] = espData
-	
-	local connection
-	connection = object.AncestryChanged:Connect(function(_, parent)
-		if not parent then
-			self:Remove(object)
-			if connection then connection:Disconnect() end
-		end
+
+	self.Objects[object] = {
+		PrimaryPart = primaryPart,
+		Name        = name,
+		Color       = color,
+		TextOnly    = options and options.TextOnly or false,
+		IsEnabled   = options and options.IsEnabled,
+		Components  = c,
+	}
+
+	-- Auto-remove when destroyed
+	object.AncestryChanged:Connect(function(_, parent)
+		if not parent then self:Remove(object) end
 	end)
-	
-	return espData
 end
 
 function ESP:Remove(object)
-	local espData = self.Objects[object]
-	if espData then
-		for _, component in pairs(espData.Components) do
-			component.Visible = false
-			component:Remove()
-		end
-		self.Objects[object] = nil
+	local data = self.Objects[object]
+	if not data then return end
+	for _, c in pairs(data.Components) do
+		c.Visible = false
+		c:Remove()
 	end
+	self.Objects[object] = nil
 end
 
 function ESP:Clear()
-	for object, _ in pairs(self.Objects) do
-		self:Remove(object)
+	for obj in pairs(self.Objects) do
+		self:Remove(obj)
 	end
 end
 
 function ESP:Update()
-	local Camera = Workspace.CurrentCamera
-	if not Camera then return end
-	
+	if not self.Enabled then
+		for _, data in pairs(self.Objects) do hideAll(data.Components) end
+		return
+	end
+
+	local cam = workspace.CurrentCamera
+	if not cam then return end
+
 	local localChar = LocalPlayer.Character
 	local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
 
-	for object, espData in pairs(self.Objects) do
-		local shouldRender = self.Enabled
-		if espData.IsEnabled and not espData.IsEnabled() then
-			shouldRender = false
-		end
-        
-        if (self.HideWhenMenuOpen and self.MenuOpen) or not shouldRender or not espData.PrimaryPart or not espData.PrimaryPart.Parent then
-			for _, component in pairs(espData.Components) do
-				component.Visible = false
-			end
-			continue
+	for _, data in pairs(self.Objects) do
+		local part = data.PrimaryPart
+		local c    = data.Components
+
+		-- Validity & custom toggle check
+		if not part or not part.Parent or (data.IsEnabled and not data.IsEnabled()) then
+			hideAll(c); continue
 		end
 
-		local rootPos = espData.PrimaryPart.Position
-        local dist = localRoot and (localRoot.Position - rootPos).Magnitude or 0
-        
-        if dist > 400 then -- Distance Culling
-            for _, component in pairs(espData.Components) do
-				component.Visible = false
-			end
-			continue
-        end
-		local topPos, onScreenTop = Camera:WorldToViewportPoint(rootPos + Vector3.new(0, 3, 0))
-		local bottomPos, onScreenBottom = Camera:WorldToViewportPoint(rootPos - Vector3.new(0, 3, 0))
-		
-		if onScreenTop or onScreenBottom then
-			local height = math.abs(topPos.Y - bottomPos.Y)
-			local width = height * 0.7 
-			local x = topPos.X - width/2
-			local y = topPos.Y
-			
-			local color = espData.Color or self.BoxColor
-			local textColor = espData.Color or self.TextColor
-			
-			if espData.TextOnly then
-				for _, c in pairs(espData.Components) do c.Visible = false end
-				
-				espData.Components.Name.Visible = true
-				espData.Components.Name.Text = espData.Name
-				espData.Components.Name.Position = Vector2.new(topPos.X, topPos.Y)
-				espData.Components.Name.Color = textColor
-				
-				if self.ShowDistance and localRoot then
-					local dist = math.floor((localRoot.Position - espData.PrimaryPart.Position).Magnitude)
-					espData.Components.Distance.Visible = true
-					espData.Components.Distance.Text = string.format("[%d studs]", dist)
-					espData.Components.Distance.Position = Vector2.new(topPos.X, topPos.Y + self.TextSize + 2)
-					espData.Components.Distance.Color = textColor
-                else
-                    espData.Components.Distance.Visible = false
-				end
-			else
-				if self.ShowBoxes then
-					espData.Components.BoxOutline.Visible = true
-					espData.Components.BoxOutline.Size = Vector2.new(width, height)
-					espData.Components.BoxOutline.Position = Vector2.new(x, y)
-					
-					espData.Components.Box.Visible = true
-					espData.Components.Box.Size = Vector2.new(width, height)
-					espData.Components.Box.Position = Vector2.new(x, y)
-					espData.Components.Box.Color = color
-				else
-					espData.Components.BoxOutline.Visible = false
-					espData.Components.Box.Visible = false
-				end
-				
-				local humanoid = object:FindFirstChildOfClass("Humanoid")
-				if self.ShowHealth and humanoid then
-					local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-					local barHeight = height * healthPercent
-					local barColor = Color3.fromHSV(healthPercent * 0.3, 1, 1) 
-					
-					espData.Components.HealthBarOutline.Visible = true
-					espData.Components.HealthBarOutline.Size = Vector2.new(2, height)
-					espData.Components.HealthBarOutline.Position = Vector2.new(x - 5, y)
-					
-					espData.Components.HealthBar.Visible = true
-					espData.Components.HealthBar.Size = Vector2.new(2, barHeight)
-					espData.Components.HealthBar.Position = Vector2.new(x - 5, y + (height - barHeight))
-					espData.Components.HealthBar.Color = barColor
-				else
-					espData.Components.HealthBarOutline.Visible = false
-					espData.Components.HealthBar.Visible = false
-				end
-				
-				if self.ShowNames then
-					espData.Components.Name.Visible = true
-					espData.Components.Name.Text = espData.Name
-					espData.Components.Name.Position = Vector2.new(x + width/2, y - self.TextSize - 2)
-					espData.Components.Name.Color = textColor
-				else
-					espData.Components.Name.Visible = false
-				end
-				
-				if self.ShowDistance and localRoot then
-					local dist = (localRoot.Position - espData.PrimaryPart.Position).Magnitude
-					espData.Components.Distance.Visible = true
-					espData.Components.Distance.Text = string.format("[%d studs]", math.floor(dist))
-					espData.Components.Distance.Position = Vector2.new(x + width/2, y + height + 2)
-					espData.Components.Distance.Color = textColor
-				else
-					espData.Components.Distance.Visible = false
-				end
-				
-				if self.ShowTracers then
-					local origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-					if self.TracerOrigin == "Top" then origin = Vector2.new(Camera.ViewportSize.X / 2, 0)
-					elseif self.TracerOrigin == "Middle" then origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-					elseif self.TracerOrigin == "Mouse" then origin = game:GetService("UserInputService"):GetMouseLocation() end
+		-- Distance cull
+		local rootPos = part.Position
+		local dist    = localRoot and (localRoot.Position - rootPos).Magnitude or 0
+		if dist > self.MaxDistance then
+			hideAll(c); continue
+		end
 
-					espData.Components.Tracer.Visible = true
-					espData.Components.Tracer.From = origin
-					espData.Components.Tracer.To = Vector2.new(x + width/2, y + height)
-					espData.Components.Tracer.Color = self.TracerColor
-				else
-					espData.Components.Tracer.Visible = false
-				end
+		local topVP, onTop       = cam:WorldToViewportPoint(rootPos + Vector3.new(0, 3, 0))
+		local bottomVP, onBottom = cam:WorldToViewportPoint(rootPos - Vector3.new(0, 3, 0))
+
+		if not (onTop or onBottom) or topVP.Z < 0 then
+			hideAll(c); continue
+		end
+
+		local color     = data.Color or self.BoxColor
+		local textColor = data.Color or self.TextColor
+		local height    = math.max(1, math.abs(topVP.Y - bottomVP.Y))
+		local width     = height * 0.6
+		local x         = topVP.X - width * 0.5
+		local y         = topVP.Y
+
+		if data.TextOnly then
+			c.BoxOut.Visible = false; c.Box.Visible = false
+			c.HpOut.Visible  = false; c.Hp.Visible  = false
+
+			c.Name.Visible  = self.ShowNames
+			c.Name.Text     = data.Name
+			c.Name.Color    = textColor
+			c.Name.Position = Vector2.new(topVP.X, y)
+
+			c.Dist.Visible  = self.ShowDistance and localRoot ~= nil
+			if c.Dist.Visible then
+				c.Dist.Text     = string.format("[%d]", math.floor(dist))
+				c.Dist.Color    = textColor
+				c.Dist.Position = Vector2.new(topVP.X, y + self.TextSize + 2)
 			end
 		else
-			for _, component in pairs(espData.Components) do
-				component.Visible = false
+			-- Box
+			local showBox = self.ShowBoxes
+			c.BoxOut.Visible = showBox
+			c.Box.Visible    = showBox
+			if showBox then
+				c.BoxOut.Size     = Vector2.new(width, height)
+				c.BoxOut.Position = Vector2.new(x, y)
+				c.Box.Size        = Vector2.new(width, height)
+				c.Box.Position    = Vector2.new(x, y)
+				c.Box.Color       = color
+			end
+
+			-- Health bar
+			local hum      = data.IsEnabled and data.Object and data.Object:FindFirstChildWhichIsA("Humanoid")
+			local showHp   = self.ShowHealth and hum ~= nil
+			c.HpOut.Visible = showHp; c.Hp.Visible = showHp
+			if showHp then
+				local pct    = math.clamp(hum.Health / math.max(1, hum.MaxHealth), 0, 1)
+				local barH   = height * pct
+				c.HpOut.Size     = Vector2.new(3, height)
+				c.HpOut.Position = Vector2.new(x - 6, y)
+				c.Hp.Size        = Vector2.new(3, barH)
+				c.Hp.Position    = Vector2.new(x - 6, y + (height - barH))
+				c.Hp.Color       = Color3.fromHSV(pct * 0.33, 1, 1)
+			end
+
+			-- Name
+			c.Name.Visible  = self.ShowNames
+			if c.Name.Visible then
+				c.Name.Text     = data.Name
+				c.Name.Color    = textColor
+				c.Name.Position = Vector2.new(x + width * 0.5, y - self.TextSize - 2)
+			end
+
+			-- Distance
+			c.Dist.Visible = self.ShowDistance and localRoot ~= nil
+			if c.Dist.Visible then
+				c.Dist.Text     = string.format("[%d]", math.floor(dist))
+				c.Dist.Color    = textColor
+				c.Dist.Position = Vector2.new(x + width * 0.5, y + height + 2)
 			end
 		end
 	end
 end
 
 function ESP:Init()
-	if self.Connections["RenderStepped"] then
-		self.Connections["RenderStepped"]:Disconnect()
-	end
-	
-	self.Connections["RenderStepped"] = RunService.RenderStepped:Connect(function()
-		self:Update()
-	end)
+	if self._conn then self._conn:Disconnect() end
+	self._conn = RunService.RenderStepped:Connect(function() self:Update() end)
 end
 
 function ESP:Unload()
 	self:Clear()
-	for _, conn in pairs(self.Connections) do
-		conn:Disconnect()
-	end
-	self.Connections = {}
+	if self._conn then self._conn:Disconnect(); self._conn = nil end
 end
 
 ESP:Init()
