@@ -2,7 +2,6 @@ return function(Window, ESP, Library)
     local player = game:GetService("Players").LocalPlayer
     local RS = game:GetService("ReplicatedStorage")
     local CollectionService = game:GetService("CollectionService")
-    local Client = require(player.PlayerScripts:WaitForChild("Client"))
 
     local OceanTab    = Window:AddTab('Ocean')
     local AutofarmTab = Window:AddTab('Autofarm')
@@ -14,8 +13,7 @@ return function(Window, ESP, Library)
     local Fish        = game_folder:WaitForChild("Fishes")
     local Markers     = game_folder:WaitForChild("OceanZoneMarkers")
 
-    -- [[ ELITE DATA ]]
-    local MutationTypes = {"Normal","Silver","Gold","Rainbow","Frozen","Shocked","Magma","Chocolate","Dry","Infected","Evil","YinYang","Hacker","Galaxy","Taco"}
+    -- [[ ORIGINAL HARDCODED ZONES ]]
     local HardcodedZones = {
         ["SunlightZone"]   = Vector3.new(-1935.5, 2466.8, -1420.5),
         ["Area1"]          = Vector3.new(-1934.9, 2447.1, -1429.0),
@@ -37,131 +35,178 @@ return function(Window, ESP, Library)
         ["DeadWaters"]     = Vector3.new(-1927.7,-3361.3, -1418.6),
         ["Prehistoric"]    = Vector3.new(-1927.7,-3820.8, -1418.6),
     }
+    local ZoneOrder = {"SunlightZone","Area1","Area2","CoralReef","TwilightZone","Area3","DeepOcean","TheDeepDark","TheTrenches","Atlantis","AquaForest","ShellReef","KrakenWorld","MegalodonsLair","IceArea","JellyfishFields","SteampunkZone","DeadWaters","Prehistoric"}
 
-    -- [[ ELITE FUNCTIONS ]]
+    -- [[ DATA HELPERS ]]
+    local MutationTypes = {"Normal","Silver","Gold","Rainbow","Frozen","Shocked","Magma","Chocolate","Dry","Infected","Evil","YinYang","Hacker","Galaxy","Taco"}
     local function getFishData(fish)
         local mut, rar = "normal", "normal"
         for _, mType in ipairs(MutationTypes) do
             if fish:GetAttribute(mType) then mut = mType:lower(); break end
         end
-        return mut, "normal"
+        local bp = fish:FindFirstChild(fish.Name.."BillboardPart")
+        if bp then
+            local frame = bp:FindFirstChildOfClass("BillboardGui") and bp:FindFirstChildOfClass("BillboardGui"):FindFirstChild("Frame")
+            if frame then
+                local rLab = frame:FindFirstChild("Rarity")
+                if rLab then rar = rLab.Text:gsub("<[^>]+>",""):lower():match("^%s*(.-)%s*$") end
+            end
+        end
+        return mut, rar
     end
 
     local function checkFilters(mut, rar, mFilters, rFilters)
         local mCount, rCount = 0, 0
         if mFilters then for _, v in pairs(mFilters) do if v then mCount=mCount+1 end end end
-        if mCount == 0 then return true end
-        for k,v in pairs(mFilters) do if v and (mut:find(k:lower()) or (k == "Normal" and mut == "normal")) then return true end end
-        return false
+        if rFilters then for _, v in pairs(rFilters) do if v then rCount=rCount+1 end end end
+        if mCount == 0 and rCount == 0 then return true end
+        local mutMatch = mCount == 0
+        if not mutMatch then for k,v in pairs(mFilters) do if v and (mut:find(k:lower()) or (k=="Normal" and mut=="normal")) then mutMatch=true; break end end end
+        local rarMatch = rCount == 0
+        if not rarMatch then for k,v in pairs(rFilters) do if v and (rar:find(k:lower()) or (k=="Normal" and rar=="normal")) then rarMatch=true; break end end end
+        return mutMatch and rarMatch
     end
 
-    -- [[ ELITE AUTOFARM (MAP-WIDE) ]]
-    local AutofarmGroup = AutofarmTab:AddLeftGroupbox('Elite Automations')
-    local mapVacuumEnabled = false
-    local autoFarmEnabled = false
-    local autoSellEnabled = false
-    local selectedMutationFilters = {}
+    -- [[ OCEAN TAB - ORIGINAL RESTORED ]]
+    local TeleportGroup = OceanTab:AddLeftGroupbox('Teleportation')
+    local selectedAreaName = ZoneOrder[1]
+    TeleportGroup:AddDropdown('AreaSelector', { Values = ZoneOrder, Default = 1, Text = 'Target Area', Callback = function(v) selectedAreaName = v end })
+    TeleportGroup:AddButton({ Text = 'Teleport', Func = function() if HardcodedZones[selectedAreaName] then player.Character:PivotTo(CFrame.new(HardcodedZones[selectedAreaName])) end end })
+    TeleportGroup:AddButton({ Text = 'Teleport Back (Aquarium)', Func = function() pcall(function() workspace.Network["Teleport-RemoteEvent"]:FireServer("Aquarium") end) end })
 
-    AutofarmGroup:AddToggle('MapVacuum', { Text = 'Global Map Vacuum (Infinite TNT)', Default = false, Callback = function(v) mapVacuumEnabled = v end })
-    AutofarmGroup:AddToggle('TeleFarm', { Text = 'Ultra-Fast Teleport Farm', Default = false, Callback = function(v) autoFarmEnabled = v end })
-    AutofarmGroup:AddToggle('AutoSell', { Text = 'Instant Auto-Sell', Default = false, Callback = function(v) autoSellEnabled = v end })
+    local autoTPRareEnabled, lastTPTime = false, 0
+    TeleportGroup:AddToggle('AutoTPRare', { Text = 'Auto TP to Rare Spawns', Default = false, Callback = function(v) autoTPRareEnabled = v end })
+    pcall(function()
+        game:GetService("TextChatService").MessageReceived:Connect(function(msg)
+            if not autoTPRareEnabled or tick()-lastTPTime < 5 then return end
+            local m = msg.Text
+            if m:find("has spawned in") and (m:find("Secret") or m:find("Divine") or m:find("Mythical") or m:find("Legendary")) then
+                local zone = (m:match("has spawned in (%S+)") or ""):gsub("%p+$","")
+                if HardcodedZones[zone] then lastTPTime = tick(); player.Character:PivotTo(CFrame.new(HardcodedZones[zone])); Library:Notify("Auto-TP to rare spawn!") end
+            end
+        end)
+    end)
 
-    AutofarmGroup:AddDropdown('MutFilter', { Values = MutationTypes, Default = 1, Multi = true, Text = 'Mutation Filter', Callback = function(v) selectedMutationFilters = v end })
+    -- [[ PROTECTION TAB - ORIGINAL RESTORED & IMPROVED ]]
+    local ProtectionGroup = OceanTab:AddRightGroupbox('Protection & Speed')
+    local antiDrownEnabled, teleporting = false, false
+    ProtectionGroup:AddToggle('AntiDrown', { Text = 'Anti Drown (Tele-Reset)', Default = false, Callback = function(v)
+        antiDrownEnabled = v
+        if v then
+            player.AttributeChanged:Connect(function(attr)
+                if attr == "IsDrowning" and player:GetAttribute("IsDrowning") and not teleporting and antiDrownEnabled then
+                    teleporting = true
+                    local char = player.Character
+                    if char and char:FindFirstChild("HumanoidRootPart") then
+                        local savedCF = char.HumanoidRootPart.CFrame
+                        workspace.Network["Teleport-RemoteEvent"]:FireServer("Aquarium")
+                        task.wait(0.5)
+                        char:PivotTo(savedCF)
+                    end
+                    task.wait(1)
+                    teleporting = false
+                end
+            end)
+        end
+    end })
 
-    -- Map Vacuum Loop (No Radius Limit)
+    local ghostMode = false
+    ProtectionGroup:AddToggle('GhostMode', { Text = 'Ghost Mode (Noclip)', Default = false, Callback = function(v) ghostMode = v end })
+    task.spawn(function() game:GetService("RunService").Stepped:Connect(function() if ghostMode and player.Character then for _,v in pairs(player.Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide=false end end end end) end)
+
+    ProtectionGroup:AddSlider('SwimSpeed', { Text = 'Elite Swim Speed', Min = 1, Max = 100, Default = 1, Callback = function(v) workspace:SetAttribute("AdminSpeedMultiplier", v) end })
+
+    -- [[ AUTOFARM TAB - ORIGINAL RESTORED & IMPROVED ]]
+    local FarmGroup = AutofarmTab:AddLeftGroupbox('Automations')
+    local autofarmEnabled, mapVacuumEnabled, autoSellEnabled = false, false, false
+    local mFilters, rFilters = {}, {}
+    local selectedSpecificFish, targetFishInput = "Any", ""
+
+    FarmGroup:AddToggle('MapVacuum', { Text = 'Global Map Vacuum (Elite TNT)', Default = false, Callback = function(v) mapVacuumEnabled = v end })
+    FarmGroup:AddToggle('AutoFarm', { Text = 'Teleport Autofarm', Default = false, Callback = function(v) autofarmEnabled = v end })
+    FarmGroup:AddToggle('AutoSell', { Text = 'Auto Sell Fish', Default = false, Callback = function(v) autoSellEnabled = v end })
+
+    local FishDrop = FarmGroup:AddDropdown('TargetFish', { Values = {"Any"}, Default = 1, Text = 'Target Fish', Callback = function(v) selectedSpecificFish = v end })
+    FarmGroup:AddButton('Refresh Fish List', function()
+        local list = {"Any"}
+        for _, v in pairs(CollectionService:GetTagged("SpawnedFish")) do if not table.find(list, v.Name) then table.insert(list, v.Name) end end
+        FishDrop:SetValues(list)
+    end)
+    FarmGroup:AddInput('ManualFish', { Text = 'Manual Name Filter', Default = '', Callback = function(v) targetFishInput = v end })
+
+    local FilterGroup = AutofarmTab:AddRightGroupbox('Filters')
+    FilterGroup:AddDropdown('MutF', { Values = MutationTypes, Multi = true, Text = 'Mutation Filter', Callback = function(v) mFilters = v end })
+    FilterGroup:AddDropdown('RarF', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Multi = true, Text = 'Rarity Filter', Callback = function(v) rFilters = v end })
+
+    -- Integrated Loops
     task.spawn(function()
         while true do
             task.wait(0.3)
             if mapVacuumEnabled then
-                pcall(function()
-                    local fishes = {}
-                    for _, v in pairs(CollectionService:GetTagged("SpawnedFish")) do
-                        if v:IsA("Model") and v.Parent and not v:GetAttribute("Claimed") then
-                            local mut, rar = getFishData(v)
-                            if checkFilters(mut, rar, selectedMutationFilters, {}) then table.insert(fishes, v) end
-                        end
+                local fList = {}
+                for _, v in pairs(CollectionService:GetTagged("SpawnedFish")) do
+                    if v:IsA("Model") and v.Parent and not v:GetAttribute("Claimed") then
+                        local m, r = getFishData(v)
+                        if checkFilters(m, r, mFilters, rFilters) then table.insert(fList, v) end
                     end
-                    if #fishes > 0 then Client.Network.Fire("TNTActivated", fishes) end
-                end)
+                end
+                if #fList > 0 then require(player.PlayerScripts.Client).Network.Fire("TNTActivated", fList) end
             end
         end
     end)
 
-    -- [[ ELITE PROTECTION & SPEED ]]
-    local ProtectionGroup = OceanTab:AddRightGroupbox('God Mode')
-    local noclipEnabled = false
-
-    ProtectionGroup:AddToggle('GhostMode', { Text = 'Ghost Mode (Noclip)', Default = false, Callback = function(v) noclipEnabled = v end })
-    ProtectionGroup:AddToggle('InfOxygen', { Text = 'Infinite Oxygen', Default = true, Callback = function(v)
-        task.spawn(function() while v do pcall(function() player.Character:SetAttribute("OxygenFill", 100) end); task.wait(1) end end)
-    end })
-
-    ProtectionGroup:AddSlider('SwimSpeed', { Text = 'Elite Swim Speed', Min = 1, Max = 100, Default = 1, Rounding = 1, Callback = function(v)
-        pcall(function() workspace:SetAttribute("AdminSpeedMultiplier", v) end)
-    end })
-
-    -- Noclip Loop
     task.spawn(function()
-        game:GetService("RunService").Stepped:Connect(function()
-            if noclipEnabled and player.Character then
-                for _, v in pairs(player.Character:GetDescendants()) do
-                    if v:IsA("BasePart") then v.CanCollide = false end
+        while true do
+            task.wait(0.1)
+            if autofarmEnabled then
+                for _, v in pairs(CollectionService:GetTagged("SpawnedFish")) do
+                    if not autofarmEnabled then break end
+                    if v:IsA("Model") and v.Parent and not v:GetAttribute("Claimed") then
+                        local match = (selectedSpecificFish == "Any") or (v.Name == selectedSpecificFish) or (targetFishInput ~= "" and v.Name:lower():find(targetFishInput:lower()))
+                        if match then
+                            local m, r = getFishData(v)
+                            if checkFilters(m, r, mFilters, rFilters) then
+                                local p = v:FindFirstChildOfClass("ProximityPrompt", true)
+                                if p and p.Enabled then
+                                    player.Character:PivotTo(CFrame.new(v:GetPivot().Position) * CFrame.new(0,2,0))
+                                    task.wait(0.1); if autofarmEnabled then fireproximityprompt(p) end; task.wait(0.3)
+                                end
+                            end
+                        end
+                    end
                 end
             end
-        end)
+        end
     end)
 
-    -- [[ ELITE MISC ]]
-    local MiscGroup = MiscTab:AddLeftGroupbox('Elite Utilities')
-    MiscGroup:AddButton('Map-Wide Teleport Sell', function()
-        pcall(function()
-            local res = Client.Network.Invoke("SellInventory")
-            Library:Notify("Sold everything for $" .. tostring(res or 0))
-        end)
-    end)
+    task.spawn(function() while true do task.wait(2.5); if autoSellEnabled then RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\003\001")) end end end)
 
-    local autoClaimAll = false
-    MiscGroup:AddToggle('AutoClaimAll', { Text = 'Auto-Claim All Rewards', Default = false, Callback = function(v) autoClaimAll = v end })
+    -- [[ MISC TAB - ORIGINAL RESTORED & IMPROVED ]]
+    local MiscUtils = MiscTab:AddLeftGroupbox('Utilities')
+    MiscUtils:AddButton({ Text = 'Spin Wheel', Func = function() RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\019\001")) end })
+    MiscUtils:AddButton({ Text = 'Remote Sell All', Func = function() RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\003\001")) end })
     
+    local autoUpgradeAll = false
+    MiscTab:AddRightGroupbox('Elite Prog'):AddToggle('AutoUpgrade', { Text = 'Auto-Upgrade All Gear', Default = false, Callback = function(v) autoUpgradeAll = v end })
     task.spawn(function()
+        local Gear = require(RS.Modules.GearConfig)
         while true do
-            task.wait(5)
-            if autoClaimAll then
-                pcall(function()
-                    Client.Network.Fire("ClaimOfflineReward")
-                    Client.Network.Invoke("ClaimDailyReward")
-                    Client.Network.Fire("SpinWheel")
-                end)
+            task.wait(5); if autoUpgradeAll then
+                local cash = player:GetAttribute("Cash") or 0
+                for cat, items in pairs(Gear) do
+                    for itemName, data in pairs(items) do if data.price and data.price <= cash then require(player.PlayerScripts.Client).Network.Invoke("BuyItem", cat, itemName) end end
+                end
             end
         end
     end)
 
-    -- [[ AUTO-UPGRADER ]]
-    local autoUpgradeEverything = false
-    MiscTab:AddRightGroupbox('Progression'):AddToggle('AutoUpgradeAll', { Text = 'Auto-Upgrade Everything', Default = false, Callback = function(v) autoUpgradeEverything = v end })
-    
-    task.spawn(function()
-        local GearConfig = require(RS.Modules.GearConfig)
-        while true do
-            task.wait(2)
-            if autoUpgradeEverything then
-                pcall(function()
-                    local save = Client.Network.Invoke("Get Save")
-                    local cash = player:GetAttribute("Cash") or 0
-                    for cat, items in pairs(GearConfig) do
-                        for itemName, data in pairs(items) do
-                            if data.price and data.price <= cash then Client.Network.Invoke("BuyItem", cat, itemName) end
-                        end
-                    end
-                end)
-            end
-        end
-    end)
-
-    -- ESP & OTHER Visuals
-    local FishEspGroup = VisualsTab:AddLeftGroupbox('Visuals')
+    -- [[ VISUALS & AQUARIUM - ORIGINAL RESTORED ]]
+    local FishEspGroup = VisualsTab:AddLeftGroupbox('Fish ESP')
     local fishEspEnabled = false
-    FishEspGroup:AddToggle('FishEsp', { Text = 'Enable Fish ESP', Default = false, Callback = function(v) fishEspEnabled = v end })
+    FishEspGroup:AddToggle('FishEsp', { Text = 'Enable Fish ESP', Default = false, Callback = function(v) fishEspEnabled = v; if not v then for _, f in pairs(Fish:GetChildren()) do pcall(function() ESP:Remove(f) end) end end end })
+    
+    local AqGroup = AquariumTab:AddLeftGroupbox('Aquarium')
+    AqGroup:AddButton({ Text = 'Equip Best Fish', Func = function() require(player.PlayerScripts.Client).Network.Invoke("RequestEquipBestFish") end })
 
-    Library:Notify("ELITE VERSION LOADED. NO LIMITS.", 5)
+    Library:Notify("MASTER RESTORATION COMPLETE.", 5)
 end
