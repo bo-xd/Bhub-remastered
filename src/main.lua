@@ -53,7 +53,6 @@ end
 local ESP = loadFile("src/util/Esp.lua")
 
 local supportedGames = {
-    [15324461939] = "src/games/divedown.lua", 
     [18512141544] = "src/games/divedown.lua", 
 }
 
