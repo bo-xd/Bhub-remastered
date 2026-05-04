@@ -114,7 +114,8 @@ return function(Window, ESP, Library)
     ProtectionGroup:AddToggle('GhostMode', { Text = 'Ghost Mode (Noclip)', Default = false, Callback = function(v) ghostMode = v end })
     task.spawn(function() game:GetService("RunService").Stepped:Connect(function() if ghostMode and player.Character then for _,v in pairs(player.Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide=false end end end end) end)
 
-    ProtectionGroup:AddSlider('SwimSpeed', { Text = 'Elite Swim Speed', Min = 1, Max = 100, Default = 1, Callback = function(v) workspace:SetAttribute("AdminSpeedMultiplier", v) end })
+    -- FIXED: Added Rounding = 1
+    ProtectionGroup:AddSlider('SwimSpeed', { Text = 'Elite Swim Speed', Min = 1, Max = 100, Default = 1, Rounding = 1, Callback = function(v) workspace:SetAttribute("AdminSpeedMultiplier", v) end })
 
     -- [[ AUTOFARM TAB - ORIGINAL RESTORED & IMPROVED ]]
     local FarmGroup = AutofarmTab:AddLeftGroupbox('Automations')
@@ -208,5 +209,5 @@ return function(Window, ESP, Library)
     local AqGroup = AquariumTab:AddLeftGroupbox('Aquarium')
     AqGroup:AddButton({ Text = 'Equip Best Fish', Func = function() require(player.PlayerScripts.Client).Network.Invoke("RequestEquipBestFish") end })
 
-    Library:Notify("MASTER RESTORATION COMPLETE.", 5)
+    Library:Notify("UI ERROR FIXED. FULL LOADING...", 5)
 end
