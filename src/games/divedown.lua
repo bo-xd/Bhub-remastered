@@ -1,6 +1,3 @@
-local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
-local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
-
 return function(Window, Tabs, ESP)
     local player = game:GetService("Players").LocalPlayer
     local Fish = workspace.Game.Fishes
@@ -229,6 +226,35 @@ return function(Window, Tabs, ESP)
         end
     end)
 
+    local VisualsGroup = OceanTab:AddRightGroupbox('Visuals')
+    local fishEspEnabled = false
+    VisualsGroup:AddToggle('FishEsp', {
+        Text = 'Fish ESP',
+        Default = false,
+        Callback = function(v) 
+            fishEspEnabled = v 
+            if not v then
+                for _, f in pairs(Fish:GetChildren()) do ESP:Remove(f) end
+            end
+        end
+    })
+
+    task.spawn(function()
+        while true do
+            if fishEspEnabled then
+                for _, f in pairs(Fish:GetChildren()) do
+                    if f:IsA("Model") and not ESP.Objects[f] then
+                        ESP:Add(f, {
+                            Name = f.Name,
+                            IsEnabled = function() return fishEspEnabled and f.Parent == Fish end
+                        })
+                    end
+                end
+            end
+            task.wait(1)
+        end
+    end)
+
     local MiscGroup = MiscTab:AddLeftGroupbox('Utilities')
     local function firePacket(id, hasResponse)
         pcall(function()
@@ -273,7 +299,9 @@ return function(Window, Tabs, ESP)
                         local treatShop = pUI.Shops:FindFirstChild("Treat") and pUI.Shops.Treat:FindFirstChild("Content") and pUI.Shops.Treat.Content:FindFirstChild("ScrollingFrame")
                         if treatShop then
                             for _, item in pairs(treatShop:GetChildren()) do
-                                if item:FindFirstChild("SlotTemplate") and tonumber(string.match(item.SlotTemplate.StockAmount.Text, "%d+")) > 0 then
+                                local slot = item:FindFirstChild("SlotTemplate")
+                                local stock = slot and tonumber(string.match(slot.StockAmount.Text, "%d+")) or 0
+                                if stock > 0 then
                                     fireBuy("Treat", item.Name)
                                 end
                             end

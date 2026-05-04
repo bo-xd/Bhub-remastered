@@ -12,11 +12,6 @@ local Window = Library:CreateWindow({
     MenuFadeTime = 0.2
 })
 
-local Tabs = {
-    Main = Window:AddTab('Universal'),
-    ['UI Settings'] = Window:AddTab('UI Settings'),
-}
-
 local GITHUB_TOKEN = "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"
 local REPO = "bo-xd/Bhub-remastered"
 local BRANCH = "main"
@@ -57,6 +52,28 @@ end
 
 local ESP = loadFile("src/util/Esp.lua")
 
+local supportedGames = {
+    [131756752872026] = "src/games/divedown.lua",
+}
+
+local gamePath = supportedGames[game.PlaceId]
+if gamePath then
+    local gameScript = loadFile(gamePath)
+    if gameScript then
+        local success, err = pcall(function()
+            gameScript(Window, {}, ESP)
+        end)
+        if not success then
+            warn("Game script error: " .. tostring(err))
+        end
+    end
+end
+
+local Tabs = {
+    Main = Window:AddTab('Universal'),
+    ['UI Settings'] = Window:AddTab('UI Settings'),
+}
+
 local EspGroup = Tabs.Main:AddLeftGroupbox('Universal ESP')
 EspGroup:AddToggle('EspEnable', { Text = 'Enable ESP', Default = false, Callback = function(v) ESP.Enabled = v end })
 EspGroup:AddToggle('EspBoxes', { Text = 'Show Boxes', Default = true, Callback = function(v) ESP.ShowBoxes = v end }):AddColorPicker('BoxColorPicker', { Default = Color3.new(1,1,1), Title = 'Box Color', Callback = function(v) ESP.BoxColor = v end })
@@ -86,20 +103,6 @@ for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
 end
 game:GetService("Players").PlayerAdded:Connect(setupPlayer)
 game:GetService("Players").PlayerRemoving:Connect(function(plr) if plr.Character then ESP:Remove(plr.Character) end end)
-
-local supportedGames = {
-    [18512143015] = "src/games/divedown.lua", -- Dive Down
-}
-
-local gamePath = supportedGames[game.PlaceId]
-if gamePath then
-    local gameScript = loadFile(gamePath)
-    if gameScript then
-        task.spawn(function()
-            gameScript(Window, Tabs, ESP)
-        end)
-    end
-end
 
 local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
 local unloadConfirm = false
