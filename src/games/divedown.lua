@@ -230,6 +230,4 @@ return function(Window, ESP, Library)
     local AqGroup = AquariumTab:AddLeftGroupbox('Aquarium')
     AqGroup:AddButton({ Text = 'Equip Best Fish', Func = function() require(player.PlayerScripts.Client).Network.Invoke("RequestEquipBestFish") end })
     AqGroup:AddDropdown('SellRarity', { Values = {"Common", "Rare", "Epic", "Legendary", "Mythical"}, Text = 'Smart Sell Rarity', Multi = false, Callback = function(v) require(player.PlayerScripts.Client).Network.Invoke("SellFishByRarity", v) end })
-
-    Library:Notify("FULL SUITE RESTORED.", 5)
 end
