@@ -8,6 +8,7 @@ return function(Window, ESP, Library)
     local RequestReplicateSound = Remotes:WaitForChild("RequestReplicateSound")
     local ToolDamageObject = Remotes:WaitForChild("ToolDamageObject")
     local PlayEnemyHitSound = Remotes:WaitForChild("PlayEnemyHitSound")
+    local RequestBagStoreItem = Remotes:WaitForChild("RequestBagStoreItem")
     
     local MainTab = Window:AddTab('Survival')
     local FarmTab = Window:AddTab('Auto Farm')
@@ -40,23 +41,27 @@ return function(Window, ESP, Library)
     local autoWood = false
     local autoKill = false
     local autoCollect = false
+    local autoStore = false
 
     FarmGroup:AddToggle('AutoWood', { Text = 'Auto Wood', Default = false, Callback = function(v) autoWood = v end })
     FarmGroup:AddToggle('AutoKill', { Text = 'Auto Kill Monsters', Default = false, Callback = function(v) autoKill = v end })
     FarmGroup:AddToggle('AutoCollect', { Text = 'Auto Collect Items', Default = false, Callback = function(v) autoCollect = v end })
+    FarmGroup:AddToggle('AutoStore', { Text = 'Auto Store Logs', Default = false, Callback = function(v) autoStore = v end })
 
-    local function getTool()
+    local function getTool(name)
         local inv = player:FindFirstChild("Inventory")
         if not inv then return nil end
-        -- Prioritize Axe for Wood, or any weapon
+        if name then return inv:FindFirstChild(name) end
         return inv:FindFirstChild("Old Axe") or inv:FindFirstChildOfClass("Model") or inv:FindFirstChildOfClass("Tool")
     end
 
     task.spawn(function()
         while true do
-            task.wait(0.5)
+            task.wait(0.3)
+            
+            -- Wood Cutting
             if autoWood then
-                local tool = getTool()
+                local tool = getTool("Old Axe") or getTool()
                 local map = workspace:FindFirstChild("Map")
                 local foliage = map and map:FindFirstChild("Foliage")
                 if tool and foliage then
@@ -68,12 +73,12 @@ return function(Window, ESP, Library)
                                 ToolDamageObject:InvokeServer(obj, tool, "12_4198471790", player.Character.Head.CFrame, false)
                                 PlayEnemyHitSound:FireServer("FireAllClients", obj, tool)
                             end)
-                            task.wait(0.1)
                         end
                     end
                 end
             end
             
+            -- Monster Killing
             if autoKill then
                 local tool = getTool()
                 local chars = workspace:FindFirstChild("Characters")
@@ -85,23 +90,37 @@ return function(Window, ESP, Library)
                                 ToolDamageObject:InvokeServer(obj, tool, "12_4198471790", player.Character.Head.CFrame, false)
                                 PlayEnemyHitSound:FireServer("FireAllClients", obj, tool)
                             end)
-                            task.wait(0.1)
                         end
                     end
                 end
             end
 
+            -- Log Storing
+            if autoStore then
+                local sack = getTool("Old Sack")
+                local itemBag = player:FindFirstChild("ItemBag")
+                if sack and itemBag then
+                    for _, item in pairs(itemBag:GetChildren()) do
+                        if not autoStore then break end
+                        if item.Name == "Log" then
+                            pcall(function()
+                                RequestReplicateSound:FireServer("FireAllClients", "BagGet", { Instance = player.Character.Head, Volume = 0.25 })
+                                RequestBagStoreItem:InvokeServer(sack, item)
+                            end)
+                        end
+                    end
+                end
+            end
+
+            -- Item Collection
             if autoCollect then
                 local items = workspace:FindFirstChild("Items")
                 if items then
                     for _, obj in pairs(items:GetChildren()) do
                         if not autoCollect then break end
-                        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                            -- Simple collection by firing ProxPrompt if exists, or moving to it
-                            local prompt = obj:FindFirstChildOfClass("ProximityPrompt") or obj:FindFirstChild("Prompt", true)
-                            if prompt then
-                                fireproximityprompt(prompt)
-                            end
+                        local prompt = obj:FindFirstChildOfClass("ProximityPrompt") or obj:FindFirstChild("Prompt", true)
+                        if prompt then
+                            fireproximityprompt(prompt)
                         end
                     end
                 end
@@ -115,14 +134,15 @@ return function(Window, ESP, Library)
     
     EntityEspGroup:AddToggle('EntityEsp', { Text = 'Enable Entity ESP', Default = false, Callback = function(v)
         entityEspEnabled = v
-        if not v then ESP:Clear() end
+        if not v then 
+            if ESP.Clear then ESP:Clear() end
+        end
     end })
 
     task.spawn(function()
         while true do
             task.wait(2)
             if entityEspEnabled then
-                -- Monsters
                 local chars = workspace:FindFirstChild("Characters")
                 if chars then
                     for _, obj in pairs(chars:GetChildren()) do
@@ -132,7 +152,6 @@ return function(Window, ESP, Library)
                     end
                 end
                 
-                -- Items
                 local items = workspace:FindFirstChild("Items")
                 if items then
                     for _, obj in pairs(items:GetChildren()) do
@@ -142,7 +161,6 @@ return function(Window, ESP, Library)
                     end
                 end
 
-                -- Foliage/Chests
                 local map = workspace:FindFirstChild("Map")
                 local foliage = map and map:FindFirstChild("Foliage")
                 if foliage then

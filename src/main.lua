@@ -122,10 +122,16 @@ ThemeManager:ApplyToTab(Tabs['UI Settings'])
 SaveManager:LoadAutoloadConfig()
 
 task.spawn(function()
+    local UIS = game:GetService("UserInputService")
     while true do
-        task.wait(0.05)
+        task.wait(0.01) -- High-speed sync
         if ESP and Library then
-            ESP.MenuOpen = Library.Toggled or Library.Visible or false
+            -- Multiple checks to ensure the menu is really closed before showing ESP
+            local isVisible = Library.Toggled or Library.Visible or Library.Open or false
+            local isMouseShowing = UIS.MouseIconEnabled
+            
+            -- If menu is visible OR mouse is showing (meaning menu is likely open), tell ESP to hide
+            ESP.MenuOpen = isVisible or isMouseShowing
         end
     end
 end)
