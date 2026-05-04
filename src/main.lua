@@ -121,17 +121,15 @@ SaveManager:BuildConfigSection(Tabs['UI Settings'])
 ThemeManager:ApplyToTab(Tabs['UI Settings'])
 SaveManager:LoadAutoloadConfig()
 
+local VisualsGroup = Tabs.Visuals:AddLeftGroupbox('ESP Settings')
+VisualsGroup:AddToggle('HideEspMenu', { Text = 'Hide ESP when Menu Open', Default = false, Callback = function(v) if ESP then ESP.HideWhenMenuOpen = v end end })
+
 task.spawn(function()
-    local UIS = game:GetService("UserInputService")
     while true do
-        task.wait(0.01) -- High-speed sync
+        task.wait(0.1)
         if ESP and Library then
-            -- Multiple checks to ensure the menu is really closed before showing ESP
-            local isVisible = Library.Toggled or Library.Visible or Library.Open or false
-            local isMouseShowing = UIS.MouseIconEnabled
-            
-            -- If menu is visible OR mouse is showing (meaning menu is likely open), tell ESP to hide
-            ESP.MenuOpen = isVisible or isMouseShowing
+            -- Use the most reliable visibility property
+            ESP.MenuOpen = Library.Toggled or Library.Visible or false
         end
     end
 end)
