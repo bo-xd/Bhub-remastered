@@ -13,7 +13,6 @@ return function(Window, ESP, Library)
     local Fish        = game_folder:WaitForChild("Fishes")
     local Markers     = game_folder:WaitForChild("OceanZoneMarkers")
 
-    -- [[ DATA ]]
     local MutationTypes = {"Normal","Silver","Gold","Rainbow","Frozen","Shocked","Magma","Chocolate","Dry","Infected","Evil","YinYang","Hacker","Galaxy","Taco"}
     local ZoneOrder = {"SunlightZone","Area1","Area2","CoralReef","TwilightZone","Area3","DeepOcean","TheDeepDark","TheTrenches","Atlantis","AquaForest","ShellReef","KrakenWorld","MegalodonsLair","IceArea","JellyfishFields","SteampunkZone","DeadWaters","Prehistoric"}
     local HardcodedZones = {
@@ -38,7 +37,6 @@ return function(Window, ESP, Library)
         ["Prehistoric"]    = Vector3.new(-1927.7,-3820.8, -1418.6),
     }
 
-    -- [[ HELPERS ]]
     local function getFishData(fish)
         local mut, rar = "normal", "normal"
         for _, mType in ipairs(MutationTypes) do
@@ -67,7 +65,6 @@ return function(Window, ESP, Library)
         return mutMatch and rarMatch
     end
 
-    -- [[ OCEAN TAB ]]
     local TeleportGroup = OceanTab:AddLeftGroupbox('Teleportation')
     local selectedAreaName = ZoneOrder[1]
     TeleportGroup:AddDropdown('AreaSelector', { Values = ZoneOrder, Default = ZoneOrder[1], Multi = false, Text = 'Target Area', Callback = function(v) selectedAreaName = v end })
@@ -113,10 +110,9 @@ return function(Window, ESP, Library)
     task.spawn(function() game:GetService("RunService").Stepped:Connect(function() if ghostMode and player.Character then for _,v in pairs(player.Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide=false end end end end) end)
     ProtectionGroup:AddSlider('SwimSpeed', { Text = 'Swim Speed', Min = 1, Max = 100, Default = 1, Rounding = 1, Compact = false, Callback = function(v) workspace:SetAttribute("AdminSpeedMultiplier", v) end })
 
-    -- [[ AUTOFARM TAB ]]
     local FarmGroup = AutofarmTab:AddLeftGroupbox('Farming')
     local autofarmEnabled, mapVacuumEnabled, autoSellEnabled = false, false, false
-    local mFilters, rFilters = {}, {}
+    local mFilters, rFilters = {["Normal"]=true}, {["Normal"]=true}
     local selectedSpecificFish, targetFishInput = "Any", ""
 
     FarmGroup:AddToggle('MapVacuum', { Text = 'Map Vacuum', Default = false, Callback = function(v) mapVacuumEnabled = v end })
@@ -132,10 +128,9 @@ return function(Window, ESP, Library)
     FarmGroup:AddInput('ManualFish', { Text = 'Manual Name Filter', Default = '', Callback = function(v) targetFishInput = v end })
 
     local FilterGroup = AutofarmTab:AddRightGroupbox('Filters')
-    FilterGroup:AddDropdown('MutF', { Values = MutationTypes, Default = "Normal", Multi = true, Text = 'Mutation Filter', Callback = function(v) mFilters = v end })
-    FilterGroup:AddDropdown('RarF', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Default = "Normal", Multi = true, Text = 'Rarity Filter', Callback = function(v) rFilters = v end })
+    FilterGroup:AddDropdown('MutF', { Values = MutationTypes, Default = {["Normal"]=true}, Multi = true, Text = 'Mutation Filter', Callback = function(v) mFilters = v end })
+    FilterGroup:AddDropdown('RarF', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Default = {["Normal"]=true}, Multi = true, Text = 'Rarity Filter', Callback = function(v) rFilters = v end })
 
-    -- LOOPS
     task.spawn(function()
         while true do
             task.wait(0.3)
@@ -178,13 +173,12 @@ return function(Window, ESP, Library)
     end)
     task.spawn(function() while true do task.wait(2.5); if autoSellEnabled then RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\003\001")) end end end)
 
-    -- [[ VISUALS TAB ]]
     local fishEspEnabled, areaEspEnabled = false, false
-    local espMFilters, espRFilters = {}, {}
+    local espMFilters, espRFilters = {["Normal"]=true}, {["Normal"]=true}
     local EspMain = VisualsTab:AddLeftGroupbox('Fish ESP')
     EspMain:AddToggle('FishEsp', { Text = 'Enable Fish ESP', Default = false, Callback = function(v) fishEspEnabled = v end })
-    EspMain:AddDropdown('EspMutF', { Values = MutationTypes, Default = "Normal", Multi = true, Text = 'ESP Mutation Filter', Callback = function(v) espMFilters = v end })
-    EspMain:AddDropdown('EspRarF', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Default = "Normal", Multi = true, Text = 'ESP Rarity Filter', Callback = function(v) espRFilters = v end })
+    EspMain:AddDropdown('EspMutF', { Values = MutationTypes, Default = {["Normal"]=true}, Multi = true, Text = 'ESP Mutation Filter', Callback = function(v) espMFilters = v end })
+    EspMain:AddDropdown('EspRarF', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Default = {["Normal"]=true}, Multi = true, Text = 'ESP Rarity Filter', Callback = function(v) espRFilters = v end })
     VisualsTab:AddRightGroupbox('Area ESP'):AddToggle('AreaEsp', { Text = 'Enable Area ESP', Default = false, Callback = function(v) areaEspEnabled = v end })
 
     task.spawn(function()
@@ -209,16 +203,19 @@ return function(Window, ESP, Library)
         end
     end)
 
-    -- [[ MISC TAB ]]
     local MiscUtils = MiscTab:AddLeftGroupbox('Utilities')
     local TimerLabel = MiscUtils:AddLabel('Timers Loading...')
     task.spawn(function()
-        local Schedule = require(RS.Modules.SpawnSchedules)
-        while true do
-            task.wait(1)
-            local function getT(id) local s = Schedule[id] or {NextSpawn=0}; return math.max(0, math.floor(s.NextSpawn - os.time())) end
-            TimerLabel:SetText(string.format("Bloop: %ds | Mermaid: %ds", getT("Bloop"), getT("Mermaid")))
-        end
+        pcall(function()
+            local BloopSched = require(RS.Modules.BloopSpawnSchedule)
+            local MermaidSched = require(RS.Modules.MermaidSpawnSchedule)
+            while true do
+                task.wait(1)
+                local bT = math.max(0, math.floor(BloopSched.NextSpawn - os.time()))
+                local mT = math.max(0, math.floor(MermaidSched.NextSpawn - os.time()))
+                TimerLabel:SetText(string.format("Bloop: %ds | Mermaid: %ds", bT, mT))
+            end
+        end)
     end)
 
     local ValueLabel = MiscUtils:AddLabel('Backpack Value: $0')
@@ -227,7 +224,12 @@ return function(Window, ESP, Library)
         while true do
             task.wait(1)
             local total = 0
-            for _, f in pairs(player:GetAttribute("BackpackFish") or {}) do total = total + (Earnings[f] or 0) end
+            local bf = player:FindFirstChild("BackpackFish")
+            if bf then
+                for _, f in pairs(bf:GetChildren()) do total = total + (Earnings[f.Name] or 0) end
+            else
+                for _, f in pairs(player:GetAttribute("BackpackFish") or {}) do total = total + (Earnings[f] or 0) end
+            end
             ValueLabel:SetText("Backpack Value: $" .. total)
         end
     end)
@@ -243,16 +245,26 @@ return function(Window, ESP, Library)
     ShopGroup:AddToggle('AutoTools', { Text = 'Auto Buy Tools', Default = false, Callback = function(v) autoShopTools = v end })
     task.spawn(function() while true do task.wait(5); if autoShopTreats then pcall(function() require(player.PlayerScripts.Client).Network.Invoke("BuyItem", "Treats", "Super Treat") end) end; if autoShopTools then pcall(function() require(player.PlayerScripts.Client).Network.Invoke("BuyItem", "Tools", "Master Tool") end) end end end)
 
-    MiscTab:AddRightGroupbox('Progression'):AddToggle('AutoUpgrade', { Text = 'Auto-Upgrade Gear', Default = false, Callback = function(v) 
+    local autoUpgradeEnabled = false
+    MiscTab:AddRightGroupbox('Progression'):AddToggle('AutoUpgrade', { Text = 'Auto-Upgrade Gear', Default = false, Callback = function(v) autoUpgradeEnabled = v end })
+    task.spawn(function()
         local Gear = require(RS.Modules.GearConfig)
-        local cash = player:GetAttribute("Cash") or 0
-        for cat, items in pairs(Gear) do for itemName, data in pairs(items) do if data.price and data.price <= cash then require(player.PlayerScripts.Client).Network.Invoke("BuyItem", cat, itemName) end end end
-    end })
+        while true do
+            task.wait(5)
+            if autoUpgradeEnabled then
+                local cash = player:GetAttribute("Cash") or 0
+                for cat, items in pairs(Gear) do
+                    for itemName, data in pairs(items) do
+                        if data.price and data.price <= cash then
+                            pcall(function() require(player.PlayerScripts.Client).Network.Invoke("BuyItem", cat, itemName) end)
+                        end
+                    end
+                end
+            end
+        end
+    end)
 
-    -- [[ AQUARIUM TAB ]]
     local AqGroup = AquariumTab:AddLeftGroupbox('Aquarium')
     AqGroup:AddButton({ Text = 'Equip Best Fish', Func = function() require(player.PlayerScripts.Client).Network.Invoke("RequestEquipBestFish") end })
     AqGroup:AddDropdown('SellRarity', { Values = {"Common", "Rare", "Epic", "Legendary", "Mythical"}, Default = "Common", Multi = false, Text = 'Smart Sell Rarity', Callback = function(v) require(player.PlayerScripts.Client).Network.Invoke("SellFishByRarity", v) end })
-
-    Library:Notify("INDEPENDENT FILTERS LOADED.", 5)
 end
