@@ -6,7 +6,6 @@ local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 local plrs = game:GetService("Players")
 local plr = plrs.LocalPlayer
 local mouse = plr:GetMouse()
-local Camera = workspace.CurrentCamera
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -85,6 +84,7 @@ FovCircle.Filled = false
 
 local function IsPlayerVisible(target)
     if not target or not target.Character then return false end
+    local Camera = workspace.CurrentCamera
     local part = target.Character:FindFirstChild(Settings.HitPart) or target.Character:FindFirstChild("HumanoidRootPart")
     if not part then return false end
     local obs = Camera:GetPartsObscuringTarget({part.Position}, {plr.Character, target.Character})
@@ -92,6 +92,7 @@ local function IsPlayerVisible(target)
 end
 
 local function GetClosestPlayer()
+    local Camera = workspace.CurrentCamera
     local closest, dist = nil, Settings.FovRadius
     for _, p in pairs(plrs:GetPlayers()) do
         if p ~= plr and func.IsAlive(p) then
@@ -180,6 +181,7 @@ OldNC = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
 end))
 
 RunService.RenderStepped:Connect(function()
+    local Camera = workspace.CurrentCamera
     if Settings.FovVisible then
         FovCircle.Visible = true
         FovCircle.Radius = Settings.FovRadius

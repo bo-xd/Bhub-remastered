@@ -22,8 +22,6 @@ local ESP = {
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
-
-local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
 local function CreateDrawing(class, properties)
@@ -100,6 +98,9 @@ function ESP:Clear()
 end
 
 function ESP:Update()
+	local Camera = Workspace.CurrentCamera
+	if not Camera then return end
+	
 	local localChar = LocalPlayer.Character
 	local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
 
