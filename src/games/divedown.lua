@@ -163,9 +163,9 @@ return function(Window, ESP)
     Fish.ChildRemoved:Connect(refreshFishList)
     AutofarmGroup:AddInput('ManualFish', { Text = 'Manual Name Filter', Default = '', Callback = function(v) targetFishInput = v end })
     local selectedMutationFilters = {}
-    AutofarmGroup:AddDropdown('MutationFilter', { Values = {"None","Silver","Gold","Rainbow","Dry","Frozen","Shocked","Chocolate","Infected","Magma","Evil","Yinyang","Hacker","Taco","Galaxy"}, Multi = true, Text = 'Mutation Filter', Callback = function(v) selectedMutationFilters = v end })
+    AutofarmGroup:AddDropdown('MutationFilter', { Values = {"None","Silver","Gold","Rainbow","Dry","Frozen","Shocked","Chocolate","Infected","Magma","Evil","Yinyang","Hacker","Taco","Galaxy"}, Multi = true, AllowNull = true, Text = 'Mutation Filter', Callback = function(v) selectedMutationFilters = v end })
     local selectedRarityFilters = {}
-    AutofarmGroup:AddDropdown('RarityFilter', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Multi = true, Text = 'Rarity Filter', Callback = function(v) selectedRarityFilters = v end })
+    AutofarmGroup:AddDropdown('RarityFilter', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Multi = true, AllowNull = true, Text = 'Rarity Filter', Callback = function(v) selectedRarityFilters = v end })
     local autoFarmEnabled = false
     AutofarmGroup:AddToggle('AutoFarm', { Text = 'Enable Autofarm', Default = false, Callback = function(v) autoFarmEnabled = v end })
     task.spawn(function()
@@ -214,8 +214,8 @@ return function(Window, ESP)
         fishEspEnabled = v
         if not v then for _, f in pairs(Fish:GetChildren()) do pcall(function() ESP:Remove(f) end) end end
     end })
-    FishEspGroup:AddDropdown('EspMutFilter', { Values = {"None","Silver","Gold","Rainbow","Dry","Frozen","Shocked","Chocolate","Infected","Magma","Evil","Yinyang","Hacker","Taco","Galaxy"}, Multi = true, Text = 'Mutation Filter', Callback = function(v) espMFilters = v end })
-    FishEspGroup:AddDropdown('EspRarFilter', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Multi = true, Text = 'Rarity Filter', Callback = function(v) espRFilters = v end })
+    FishEspGroup:AddDropdown('EspMutFilter', { Values = {"None","Silver","Gold","Rainbow","Dry","Frozen","Shocked","Chocolate","Infected","Magma","Evil","Yinyang","Hacker","Taco","Galaxy"}, Multi = true, AllowNull = true, Text = 'Mutation Filter', Callback = function(v) espMFilters = v end })
+    FishEspGroup:AddDropdown('EspRarFilter', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Multi = true, AllowNull = true, Text = 'Rarity Filter', Callback = function(v) espRFilters = v end })
     task.spawn(function()
         while true do
             task.wait(1)
@@ -352,7 +352,7 @@ return function(Window, ESP)
 
     local smartSellEnabled = false
     local smartSellFilters = {}
-    AqGroup:AddDropdown('SmartSellFilter', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Multi = true, Text = 'Smart Sell Rarity', Callback = function(v) smartSellFilters = v end })
+    AqGroup:AddDropdown('SmartSellFilter', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Multi = true, AllowNull = true, Text = 'Smart Sell Rarity', Callback = function(v) smartSellFilters = v end })
     AqGroup:AddToggle('SmartSell', { Text = 'Smart Sell Fish', Default = false, Callback = function(v) smartSellEnabled = v end })
     task.spawn(function()
         while true do
