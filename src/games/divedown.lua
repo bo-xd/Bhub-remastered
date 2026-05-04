@@ -1,39 +1,37 @@
 return function(Window, ESP, Library)
     local player = game:GetService("Players").LocalPlayer
-    local RunService = game:GetService("RunService")
     local RS = game:GetService("ReplicatedStorage")
 
-    local OceanTab   = Window:AddTab('Ocean')
+    local OceanTab    = Window:AddTab('Ocean')
     local AutofarmTab = Window:AddTab('Autofarm')
-    local VisualsTab = Window:AddTab('Visuals')
-    local MiscTab    = Window:AddTab('Misc')
+    local VisualsTab  = Window:AddTab('Visuals')
+    local MiscTab     = Window:AddTab('Misc')
     local AquariumTab = Window:AddTab('Aquarium')
 
     local game_folder = workspace:WaitForChild("Game")
-    local Fish = game_folder:WaitForChild("Fishes")
-    local Markers = game_folder:WaitForChild("OceanZoneMarkers")
+    local Fish        = game_folder:WaitForChild("Fishes")
+    local Markers     = game_folder:WaitForChild("OceanZoneMarkers")
 
-    -- ─── Zones ────────────────────────────────────────────────────────────────
     local HardcodedZones = {
-        ["SunlightZone"]  = Vector3.new(-1935.5, 2466.8, -1420.5),
-        ["Area1"]         = Vector3.new(-1934.9, 2447.1, -1429.0),
-        ["Area2"]         = Vector3.new(-1929.5, 2338.1, -1423.4),
-        ["CoralReef"]     = Vector3.new(-1934.0, 2336.6, -1418.3),
-        ["TwilightZone"]  = Vector3.new(-1928.1, 2106.0, -1421.2),
-        ["Area3"]         = Vector3.new(-1916.1, 2029.2, -1424.2),
-        ["DeepOcean"]     = Vector3.new(-1924.9, 1722.5, -1422.4),
-        ["TheDeepDark"]   = Vector3.new(-1938.6, 1004.3, -1422.2),
-        ["TheTrenches"]   = Vector3.new(-1938.6,  310.9, -1422.2),
-        ["Atlantis"]      = Vector3.new(-1932.6,  -17.7, -1423.0),
-        ["AquaForest"]    = Vector3.new(-1932.6, -304.3, -1423.0),
-        ["ShellReef"]     = Vector3.new(-1932.6, -645.4, -1423.0),
-        ["KrakenWorld"]   = Vector3.new(-1932.6,-1107.9, -1423.0),
-        ["MegalodonsLair"]= Vector3.new(-1927.7,-1591.8, -1418.6),
-        ["IceArea"]       = Vector3.new(-1927.7,-1961.3, -1418.6),
-        ["JellyfishFields"]= Vector3.new(-1927.7,-2373.8,-1418.6),
-        ["SteampunkZone"] = Vector3.new(-1927.7,-2885.3, -1418.6),
-        ["DeadWaters"]    = Vector3.new(-1927.7,-3361.3, -1418.6),
-        ["Prehistoric"]   = Vector3.new(-1927.7,-3820.8, -1418.6),
+        ["SunlightZone"]   = Vector3.new(-1935.5, 2466.8, -1420.5),
+        ["Area1"]          = Vector3.new(-1934.9, 2447.1, -1429.0),
+        ["Area2"]          = Vector3.new(-1929.5, 2338.1, -1423.4),
+        ["CoralReef"]      = Vector3.new(-1934.0, 2336.6, -1418.3),
+        ["TwilightZone"]   = Vector3.new(-1928.1, 2106.0, -1421.2),
+        ["Area3"]          = Vector3.new(-1916.1, 2029.2, -1424.2),
+        ["DeepOcean"]      = Vector3.new(-1924.9, 1722.5, -1422.4),
+        ["TheDeepDark"]    = Vector3.new(-1938.6, 1004.3, -1422.2),
+        ["TheTrenches"]    = Vector3.new(-1938.6,  310.9, -1422.2),
+        ["Atlantis"]       = Vector3.new(-1932.6,  -17.7, -1423.0),
+        ["AquaForest"]     = Vector3.new(-1932.6, -304.3, -1423.0),
+        ["ShellReef"]      = Vector3.new(-1932.6, -645.4, -1423.0),
+        ["KrakenWorld"]    = Vector3.new(-1932.6,-1107.9, -1423.0),
+        ["MegalodonsLair"] = Vector3.new(-1927.7,-1591.8, -1418.6),
+        ["IceArea"]        = Vector3.new(-1927.7,-1961.3, -1418.6),
+        ["JellyfishFields"]= Vector3.new(-1927.7,-2373.8, -1418.6),
+        ["SteampunkZone"]  = Vector3.new(-1927.7,-2885.3, -1418.6),
+        ["DeadWaters"]     = Vector3.new(-1927.7,-3361.3, -1418.6),
+        ["Prehistoric"]    = Vector3.new(-1927.7,-3820.8, -1418.6),
     }
     local ZoneOrder = {
         "SunlightZone","Area1","Area2","CoralReef","TwilightZone","Area3","DeepOcean",
@@ -41,7 +39,6 @@ return function(Window, ESP, Library)
         "MegalodonsLair","IceArea","JellyfishFields","SteampunkZone","DeadWaters","Prehistoric"
     }
 
-    -- ─── Helpers ──────────────────────────────────────────────────────────────
     local function getFishData(fish)
         local mut, rar = "none", "normal"
         local bp = fish:FindFirstChild(fish.Name.."BillboardPart") or fish:WaitForChild(fish.Name.."BillboardPart", 2)
@@ -65,11 +62,11 @@ return function(Window, ESP, Library)
         local rarMatch = rCount == 0
         if not mutMatch then
             if mFilters["None"] and (mut=="none" or mut=="normal") then mutMatch=true
-            else for k,v in pairs(mFilters) do if v and string.find(mut,k:lower()) then mutMatch=true break end end end
+            else for k,v in pairs(mFilters) do if v and string.find(mut,k:lower()) then mutMatch=true; break end end end
         end
         if not rarMatch then
             if rFilters["Normal"] and (rar=="normal" or rar=="") then rarMatch=true
-            else for k,v in pairs(rFilters) do if v and string.find(rar,k:lower()) then rarMatch=true break end end end
+            else for k,v in pairs(rFilters) do if v and string.find(rar,k:lower()) then rarMatch=true; break end end end
         end
         return mutMatch and rarMatch
     end
@@ -91,7 +88,6 @@ return function(Window, ESP, Library)
         return Color3.fromRGB(150,150,150)
     end
 
-    -- ─── Ocean Tab ────────────────────────────────────────────────────────────
     local selectedAreaName = ZoneOrder[1]
     local TeleportGroup = OceanTab:AddLeftGroupbox('Teleportation')
     TeleportGroup:AddDropdown('AreaSelector', { Values = ZoneOrder, Default = 1, Multi = false, Text = 'Target Area', Callback = function(v) selectedAreaName = v end })
@@ -120,34 +116,36 @@ return function(Window, ESP, Library)
         end)
     end)
 
-    -- ─── Protection / Modifiers ───────────────────────────────────────────────
     local ProtectionGroup = OceanTab:AddRightGroupbox('Protection & Speed')
 
-    -- Anti-Drown: the game pauses the oxygen tween when oxygenPaused attr changes to true.
-    -- We must *toggle* it (false → true) each loop to keep triggering AttributeChanged.
     local antiDrownEnabled = false
-    local antiDrownThread = nil
+    local antiDrownConn = nil
     ProtectionGroup:AddToggle('AntiDrown', { Text = 'Anti Drown', Default = false, Callback = function(v)
         antiDrownEnabled = v
         if v then
-            antiDrownThread = task.spawn(function()
-                while antiDrownEnabled do
-                    pcall(function()
-                        player:SetAttribute("oxygenPaused", false)
-                        task.wait(0.05)
-                        player:SetAttribute("oxygenPaused", true)
-                    end)
-                    task.wait(0.5)
-                end
-            end)
-        else
-            if antiDrownThread then task.cancel(antiDrownThread); antiDrownThread = nil end
-            pcall(function() player:SetAttribute("oxygenPaused", false) end)
+            if not antiDrownConn then
+                local teleporting = false
+                antiDrownConn = player.AttributeChanged:Connect(function(attr)
+                    if attr == "IsDrowning" and player:GetAttribute("IsDrowning") and not teleporting and antiDrownEnabled then
+                        teleporting = true
+                        local char = player.Character
+                        if char and char:FindFirstChild("HumanoidRootPart") then
+                            local savedCF = char.HumanoidRootPart.CFrame
+                            pcall(function() workspace.Network["Teleport-RemoteEvent"]:FireServer("Aquarium") end)
+                            task.wait(0.5)
+                            char:PivotTo(savedCF)
+                        end
+                        task.wait(1)
+                        teleporting = false
+                    end
+                end)
+            end
+        elseif antiDrownConn then
+            antiDrownConn:Disconnect()
+            antiDrownConn = nil
         end
     end })
 
-    -- Swim Speed: AdminSpeedMultiplier is read every frame by the game's swim LocalScript.
-    -- Setting it on workspace (client-side) is sufficient since both scripts run on the same client.
     local swimSpeedVal = 1
     ProtectionGroup:AddSlider('SwimSpeed', { Text = 'Swim Speed Multiplier', Min = 1, Max = 20, Default = 1, Rounding = 1, Callback = function(v)
         swimSpeedVal = v
@@ -158,7 +156,6 @@ return function(Window, ESP, Library)
         pcall(function() workspace:SetAttribute("AdminSpeedMultiplier", swimSpeedVal) end)
     end)
 
-    -- Reach
     local reachEnabled = false
     ProtectionGroup:AddToggle('Reach', { Text = 'Reach / Instant Interact', Default = false, Callback = function(v)
         reachEnabled = v
@@ -169,7 +166,6 @@ return function(Window, ESP, Library)
         end
     end })
 
-    -- ─── Autofarm Tab ─────────────────────────────────────────────────────────
     local function getUniqueFishes()
         local list, map = {"Any"}, {}
         for _, v in ipairs(Fish:GetChildren()) do
@@ -184,7 +180,6 @@ return function(Window, ESP, Library)
     local targetFishInput = ""
     local FishDropdown = AutofarmGroup:AddDropdown('TargetFish', { Values = getUniqueFishes(), Default = 1, Text = 'Target Fish', Callback = function(v) selectedSpecificFish = v end })
 
-    -- Event-driven refresh (no more polling)
     local isRefreshing = false
     local function refreshFishList()
         if isRefreshing then return end
@@ -243,25 +238,18 @@ return function(Window, ESP, Library)
         while true do
             task.wait(2.5)
             if autoSellEnabled then
-                pcall(function()
-                    local Packets = RS.Packets.Packet
-                    Packets.RemoteEvent:FireServer(buffer.fromstring("\003\001"))
-                end)
+                pcall(function() RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\003\001")) end)
             end
         end
     end)
 
-    -- ─── Visuals Tab ──────────────────────────────────────────────────────────
-    -- Fish ESP — completely independent, does NOT need ESP.Enabled
     local FishEspGroup = VisualsTab:AddLeftGroupbox('Fish ESP')
     local fishEspEnabled = false
     local espMFilters, espRFilters = {}, {}
 
     FishEspGroup:AddToggle('FishEsp', { Text = 'Enable Fish ESP', Default = false, Callback = function(v)
         fishEspEnabled = v
-        if not v then
-            for _, f in pairs(Fish:GetChildren()) do pcall(function() ESP:Remove(f) end) end
-        end
+        if not v then for _, f in pairs(Fish:GetChildren()) do pcall(function() ESP:Remove(f) end) end end
     end })
     FishEspGroup:AddDropdown('EspMutFilter', { Values = {"None","Silver","Gold","Rainbow","Dry","Frozen","Shocked","Chocolate","Infected","Magma","Evil","Yinyang","Hacker","Taco","Galaxy"}, Default = 1, Multi = true, Text = 'Mutation Filter', Callback = function(v) espMFilters = v end })
     FishEspGroup:AddDropdown('EspRarFilter', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Default = 1, Multi = true, Text = 'Rarity Filter', Callback = function(v) espRFilters = v end })
@@ -279,29 +267,16 @@ return function(Window, ESP, Library)
         end)
     end
 
-    -- Event-driven: add ESP when fish spawns, remove when it despawns
-    Fish.ChildAdded:Connect(function(f)
-        task.wait(0.5) -- let BillboardPart load
-        addFishEsp(f)
-    end)
-    Fish.ChildRemoved:Connect(function(f)
-        pcall(function() ESP:Remove(f) end)
-    end)
+    Fish.ChildAdded:Connect(function(f) task.wait(0.5); addFishEsp(f) end)
+    Fish.ChildRemoved:Connect(function(f) pcall(function() ESP:Remove(f) end) end)
 
-    -- Full refresh when toggled on
     local function refreshFishEsp()
         for _, f in pairs(Fish:GetChildren()) do
-            if fishEspEnabled then
-                addFishEsp(f)
-            else
-                pcall(function() ESP:Remove(f) end)
-            end
+            if fishEspEnabled then addFishEsp(f) else pcall(function() ESP:Remove(f) end) end
         end
     end
-    -- Also re-apply filter changes
     FishEspGroup:AddButton({ Text = 'Refresh Filter', Func = refreshFishEsp })
 
-    -- Area ESP — completely independent
     local AreaEspGroup = VisualsTab:AddRightGroupbox('Area ESP')
     local areaEspEnabled = false
 
@@ -318,18 +293,14 @@ return function(Window, ESP, Library)
         end
     end })
 
-    -- Event-driven: add ESP when zone loads
     Markers.ChildAdded:Connect(function(m)
         task.wait(0.5)
         if areaEspEnabled and not ESP.Objects[m] then
             pcall(function() ESP:Add(m, { Name="[Zone] "..m.Name, Color=Color3.fromRGB(0,150,255), TextOnly=true, IsEnabled=function() return areaEspEnabled end }) end)
         end
     end)
-    Markers.ChildRemoved:Connect(function(m)
-        pcall(function() ESP:Remove(m) end)
-    end)
+    Markers.ChildRemoved:Connect(function(m) pcall(function() ESP:Remove(m) end) end)
 
-    -- ─── Misc Tab ─────────────────────────────────────────────────────────────
     local function firePacket(id, hasResponse)
         pcall(function()
             RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring(string.char(id)..(hasResponse and "\001" or "")))
@@ -337,16 +308,74 @@ return function(Window, ESP, Library)
     end
 
     local MiscGroup = MiscTab:AddLeftGroupbox('Utilities')
-    MiscGroup:AddButton({ Text = 'Spin Wheel',         Func = function() firePacket(19, true)  end })
-    MiscGroup:AddButton({ Text = 'Claim Offline Reward',Func = function() firePacket(10, false) end })
-    MiscGroup:AddButton({ Text = 'Cancel Death Screen', Func = function() firePacket(11, false) end })
-    MiscGroup:AddButton({ Text = 'Respawn',             Func = function() firePacket(7,  false) end })
+    MiscGroup:AddButton({ Text = 'Spin Wheel',          Func = function() firePacket(19, true)  end })
+    MiscGroup:AddButton({ Text = 'Claim Offline Reward', Func = function() firePacket(10, false) end })
+    MiscGroup:AddButton({ Text = 'Cancel Death Screen',  Func = function() firePacket(11, false) end })
+    MiscGroup:AddButton({ Text = 'Respawn',              Func = function() firePacket(7,  false) end })
 
     local autoSpin = false
     MiscGroup:AddToggle('AutoSpin', { Text = 'Auto Spin Wheel', Default = false, Callback = function(v) autoSpin = v end })
-    task.spawn(function() while true do task.wait(10) if autoSpin then firePacket(19, true) end end end)
+    task.spawn(function() while true do task.wait(10); if autoSpin then firePacket(19, true) end end end)
 
-    local ShopGroup = MiscTab:AddRightGroupbox('Auto Shop')
+    local ExploitGroup = MiscTab:AddRightGroupbox('Exploits')
+
+    ExploitGroup:AddButton({ Text = 'Recover Lost Items [TEST]', Func = function()
+        local inv = player:FindFirstChild("Inventory")
+        if not inv then Library:Notify("No Inventory found"); return end
+        local count = 0
+        for _, item in pairs(inv:GetChildren()) do
+            pcall(function()
+                RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring(string.char(13)..string.char(1)..item.Name))
+                count = count + 1
+            end)
+            task.wait(0.1)
+        end
+        Library:Notify("Fired RecoverItem for "..count.." items")
+    end })
+
+    ExploitGroup:AddButton({ Text = 'Remove Weight (Better Swim)', Func = function()
+        pcall(function()
+            local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local wa = hrp:FindFirstChild("WeightAttachment")
+                if wa then wa:Destroy() end
+            end
+        end)
+    end })
+
+    local autoRemoveWeight = false
+    ExploitGroup:AddToggle('AutoRemoveWeight', { Text = 'Auto Remove Weight', Default = false, Callback = function(v)
+        autoRemoveWeight = v
+    end })
+    task.spawn(function()
+        while true do
+            task.wait(1)
+            if autoRemoveWeight then
+                pcall(function()
+                    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        local wa = hrp:FindFirstChild("WeightAttachment")
+                        if wa then wa:Destroy() end
+                    end
+                end)
+            end
+        end
+    end)
+
+    local skinNameInput = ""
+    ExploitGroup:AddInput('SkinName', { Text = 'Skin Name (exact)', Default = '', Callback = function(v) skinNameInput = v end })
+    ExploitGroup:AddButton({ Text = 'Equip Aquarium Skin', Func = function()
+        if skinNameInput == "" then Library:Notify("Enter a skin name first") return end
+        pcall(function()
+            RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\016" .. string.char(#skinNameInput) .. skinNameInput))
+            Library:Notify("Tried to equip skin: " .. skinNameInput)
+        end)
+    end })
+
+    ExploitGroup:AddButton({ Text = 'Open Weather Machine', Func = function() firePacket(8, false) end })
+    ExploitGroup:AddButton({ Text = 'Request Rainbow Machine', Func = function() firePacket(18, true) end })
+
+    local ShopGroup = MiscTab:AddLeftGroupbox('Auto Shop')
     local function fireBuy(store, item)
         pcall(function()
             RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring(string.char(4)..string.char(#store)..store..string.char(#item)..item))
@@ -373,7 +402,7 @@ return function(Window, ESP, Library)
                             local txt = stockLabel.Text:upper()
                             if not txt:find("NO STOCK") then
                                 local stock = tonumber(txt:match("%d+")) or 0
-                                for i = 1, stock do if not enabled then break end; fireBuy(name, item.Name); task.wait(0.15) end
+                                for _ = 1, stock do if not enabled then break end; fireBuy(name, item.Name); task.wait(0.15) end
                             end
                         end
                     end
@@ -384,7 +413,6 @@ return function(Window, ESP, Library)
         end
     end)
 
-    -- ─── Aquarium Tab ─────────────────────────────────────────────────────────
     local AqGroup = AquariumTab:AddLeftGroupbox('Aquarium')
     local function equipBest()
         pcall(function()
@@ -396,7 +424,7 @@ return function(Window, ESP, Library)
     AqGroup:AddButton({ Text = 'Equip Best Fish', Func = equipBest })
     local autoEquipBest = false
     AqGroup:AddToggle('AutoEquipBest', { Text = 'Auto Equip Best', Default = false, Callback = function(v) autoEquipBest = v end })
-    task.spawn(function() while true do task.wait(5) if autoEquipBest then equipBest() end end end)
+    task.spawn(function() while true do task.wait(5); if autoEquipBest then equipBest() end end end)
 
     local smartSellFilters = {}
     local smartSellEnabled = false
