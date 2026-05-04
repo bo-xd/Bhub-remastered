@@ -390,6 +390,70 @@ return function(Window, ESP, Library)
         end
     end)
 
+    -- [[ NEW FEATURES BASED ON DECOMPILED INFO ]]
+    
+    -- 1. Admin Join Notifier
+    game:GetService("Players").PlayerAdded:Connect(function(p)
+        if p:GetAttribute("IsAdmin") or p:GetAttribute("IsDev") then
+            Library:Notify("⚠️ ADMIN JOINED: " .. p.Name, 15)
+            if autoFarmEnabled then autoFarmEnabled = false; Library:Notify("Autofarm disabled for safety!") end
+        end
+    end)
+
+    -- 2. Profit Predictor (Backpack Value)
+    local FishEarnings = require(RS.Modules.FishEarnings)
+    local BackpackLabel = MiscTab:AddLabel('Backpack Value: $0')
+    task.spawn(function()
+        while true do
+            task.wait(2)
+            local total = 0
+            for _, tool in pairs(player.Backpack:GetChildren()) do
+                if tool:IsA("Tool") and tool:GetAttribute("Weight") then
+                    local fakeFish = {
+                        Name = tool.Name,
+                        Weight = tool:GetAttribute("Weight"),
+                        Mutations = tool:GetAttribute("Mutations") or {},
+                        AgeYears = tool:GetAttribute("AgeYears") or 0,
+                        Zone = tool:GetAttribute("Zone") or "SunlightZone"
+                    }
+                    total = total + FishEarnings.calculateCashPerSecond(nil, fakeFish)
+                end
+            end
+            BackpackLabel:SetText("Backpack Value: $" .. tostring(total))
+        end
+    end)
+
+    -- 3. Auto-Gear Upgrader
+    local GearConfig = require(RS.Modules.GearConfig)
+    local autoUpgradeGear = false
+    ProtectionGroup:AddToggle('AutoUpgradeGear', { Text = 'Auto-Upgrade Gear', Default = false, Callback = function(v) autoUpgradeGear = v end })
+    task.spawn(function()
+        while true do
+            task.wait(5)
+            if autoUpgradeGear then
+                pcall(function()
+                    local save = require(player.PlayerScripts.Client).Network.Invoke("Get Save")
+                    local cash = player:GetAttribute("Cash") or 0
+                    for category, items in pairs(GearConfig) do
+                        local owned = save.OwnedGear and save.OwnedGear[category] or {}
+                        local nextItem = nil
+                        for itemName, data in pairs(items) do
+                            if not table.find(owned, itemName) and data.price then
+                                if not nextItem or data.order < GearConfig[category][nextItem].order then
+                                    nextItem = itemName
+                                end
+                            end
+                        end
+                        if nextItem and GearConfig[category][nextItem].price <= cash then
+                            require(player.PlayerScripts.Client).Network.Invoke("BuyItem", category, nextItem)
+                            Library:Notify("Auto-Upgraded " .. category .. " to " .. nextItem)
+                        end
+                    end
+                end)
+            end
+        end
+    end)
+
     local ShopGroup = MiscTab:AddLeftGroupbox('Auto Shop')
     local function fireBuy(store, item) pcall(function() RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring(string.char(4)..string.char(#store)..store..string.char(#item)..item)) end) end
     local autoBuyTreats, autoBuyTools = false, false
