@@ -60,11 +60,12 @@ local gamePath = supportedGames[game.PlaceId]
 if gamePath then
     local gameScript = loadFile(gamePath)
     if gameScript then
-        pcall(function()
-            gameScript(Window, {}, ESP)
+        task.spawn(function()
+            gameScript(Window, ESP)
         end)
     end
 end
+task.wait(0.2)
 
 local Tabs = {
     Main = Window:AddTab('Universal'),
