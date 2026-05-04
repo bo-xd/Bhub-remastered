@@ -45,7 +45,7 @@ local ESP = loadFile("src/util/Esp.lua")
 
 local supportedGames = { 
     [131756752872026] = "src/games/divedown.lua",
-    [79546208627805] = "src/games/99nights.lua" 
+    [126509999114328] = "src/games/99nights.lua" 
 }
 local gamePath = supportedGames[game.PlaceId]
 if gamePath then
