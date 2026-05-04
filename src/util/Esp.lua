@@ -121,6 +121,14 @@ function ESP:Update()
 		end
 
 		local rootPos = espData.PrimaryPart.Position
+        local dist = localRoot and (localRoot.Position - rootPos).Magnitude or 0
+        
+        if dist > 400 then -- Distance Culling
+            for _, component in pairs(espData.Components) do
+				component.Visible = false
+			end
+			continue
+        end
 		local topPos, onScreenTop = Camera:WorldToViewportPoint(rootPos + Vector3.new(0, 3, 0))
 		local bottomPos, onScreenBottom = Camera:WorldToViewportPoint(rootPos - Vector3.new(0, 3, 0))
 		

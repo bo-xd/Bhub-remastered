@@ -52,12 +52,18 @@ return function(Window, ESP, Library)
         local inv = player:FindFirstChild("Inventory")
         if not inv then return nil end
         if name then return inv:FindFirstChild(name) end
-        return inv:FindFirstChild("Old Axe") or inv:FindFirstChildOfClass("Model") or inv:FindFirstChildOfClass("Tool")
+        
+        for _, item in pairs(inv:GetChildren()) do
+            if item.Name:lower():find("axe") or item.Name:lower():find("weapon") or item.Name:lower():find("sword") then
+                return item
+            end
+        end
+        return inv:FindFirstChildOfClass("Model")
     end
 
     task.spawn(function()
         while true do
-            task.wait(0.3)
+            task.wait(0.2)
             
             -- Wood Cutting
             if autoWood then
@@ -67,10 +73,11 @@ return function(Window, ESP, Library)
                 if tool and foliage then
                     for _, obj in pairs(foliage:GetChildren()) do
                         if not autoWood then break end
-                        if obj.Name:find("Tree") and (player.Character and player.Character:FindFirstChild("Head")) then
+                        if obj.Name:find("Tree") then
                             pcall(function()
+                                local hitCFrame = obj:GetPivot()
                                 RequestReplicateSound:FireServer("FireAllClients", "WoodChop", { Instance = player.Character.Head, Volume = 0.4 })
-                                ToolDamageObject:InvokeServer(obj, tool, "12_4198471790", player.Character.Head.CFrame, false)
+                                ToolDamageObject:InvokeServer(obj, tool, "12_4198471790", hitCFrame, false)
                                 PlayEnemyHitSound:FireServer("FireAllClients", obj, tool)
                             end)
                         end
@@ -85,9 +92,10 @@ return function(Window, ESP, Library)
                 if tool and chars then
                     for _, obj in pairs(chars:GetChildren()) do
                         if not autoKill then break end
-                        if obj ~= player.Character and (player.Character and player.Character:FindFirstChild("Head")) then
+                        if obj ~= player.Character then
                             pcall(function()
-                                ToolDamageObject:InvokeServer(obj, tool, "12_4198471790", player.Character.Head.CFrame, false)
+                                local hitCFrame = obj:GetPivot()
+                                ToolDamageObject:InvokeServer(obj, tool, "12_4198471790", hitCFrame, false)
                                 PlayEnemyHitSound:FireServer("FireAllClients", obj, tool)
                             end)
                         end
