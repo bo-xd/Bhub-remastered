@@ -1,6 +1,7 @@
 return function(Window, ESP, Library)
     local player = game:GetService("Players").LocalPlayer
     local RS = game:GetService("ReplicatedStorage")
+    local CollectionService = game:GetService("CollectionService")
 
     local OceanTab    = Window:AddTab('Ocean')
     local AutofarmTab = Window:AddTab('Autofarm')
@@ -42,16 +43,12 @@ return function(Window, ESP, Library)
     local MutationTypes = {"Normal","Silver","Gold","Rainbow","Frozen","Shocked","Magma","Chocolate","Dry","Infected","Evil","YinYang","Hacker","Galaxy","Taco"}
     local function getFishData(fish)
         local mut, rar = "none", "normal"
-        
-        -- 1. Check Attributes (MutationService style)
         for _, mType in ipairs(MutationTypes) do
             if fish:GetAttribute(mType) then
                 if mType ~= "Normal" then mut = mType:lower() end
                 break
             end
         end
-        
-        -- 2. Scrape BillboardGui (Fallback for Rarity or if attributes aren't loaded)
         local bp = fish:FindFirstChild(fish.Name.."BillboardPart")
         if bp then
             local frame = bp:FindFirstChildOfClass("BillboardGui") and bp:FindFirstChildOfClass("BillboardGui"):FindFirstChild("Frame")
@@ -75,8 +72,8 @@ return function(Window, ESP, Library)
 
     local function checkFilters(mut, rar, mFilters, rFilters)
         local mCount, rCount = 0, 0
-        for _, v in pairs(mFilters) do if v then mCount=mCount+1 end end
-        for _, v in pairs(rFilters) do if v then rCount=rCount+1 end end
+        if mFilters then for _, v in pairs(mFilters) do if v then mCount=mCount+1 end end end
+        if rFilters then for _, v in pairs(rFilters) do if v then rCount=rCount+1 end end end
         local mutMatch = mCount == 0
         local rarMatch = rCount == 0
         if not mutMatch then
@@ -144,7 +141,6 @@ return function(Window, ESP, Library)
     end)
 
     local ProtectionGroup = OceanTab:AddRightGroupbox('Protection & Speed')
-
     local antiDrownEnabled = false
     local antiDrownConn = nil
     ProtectionGroup:AddToggle('AntiDrown', { Text = 'Anti Drown', Default = false, Callback = function(v)
@@ -184,71 +180,100 @@ return function(Window, ESP, Library)
     end)
 
     local reachEnabled = false
+    local function applyReach(p)
+        if reachEnabled and p:IsA("ProximityPrompt") then
+            p.HoldDuration = 0
+            p.MaxActivationDistance = 60
+            p.RequiresLineOfSight = false
+        end
+    end
+    workspace.DescendantAdded:Connect(applyReach)
     ProtectionGroup:AddToggle('Reach', { Text = 'Reach / Instant Interact', Default = false, Callback = function(v)
         reachEnabled = v
-        if v then
-            for _, p in pairs(workspace:GetDescendants()) do
-                if p:IsA("ProximityPrompt") then p.HoldDuration=0; p.MaxActivationDistance=50; p.RequiresLineOfSight=false end
-            end
-        end
+        if v then for _, p in pairs(workspace:GetDescendants()) do applyReach(p) end end
     end })
 
-    local function getUniqueFishes()
-        local list, map = {"Any"}, {}
-        for _, v in ipairs(Fish:GetChildren()) do
-            if v:IsA("Model") and not map[v.Name] then map[v.Name]=true; table.insert(list, v.Name) end
+    local function getPredictedPosition(v)
+        local sPos = v:GetAttribute("StartPos")
+        local tPos = v:GetAttribute("TargetPos")
+        local sTime = v:GetAttribute("StartTime")
+        local speed = v:GetAttribute("Speed") or 5
+        if sPos and tPos and sTime then
+            local now = workspace:GetServerTimeNow()
+            local elapsed = now - sTime
+            local dist = (tPos - sPos).Magnitude
+            local duration = dist / (speed > 0 and speed or 5)
+            local alpha = math.clamp(elapsed / (duration > 0 and duration or 0.1), 0, 1)
+            return sPos:Lerp(tPos, alpha)
         end
-        table.sort(list, function(a,b) if a=="Any" then return true end if b=="Any" then return false end return a<b end)
-        return list
+        return v:GetPivot().Position
     end
 
-    local AutofarmGroup = AutofarmTab:AddLeftGroupbox('Settings')
+    local AutofarmGroup = AutofarmTab:AddLeftGroupbox('Automations')
+    local autoFarmEnabled = false
+    local tntSpoofEnabled = false
+    local selectedMutationFilters, selectedRarityFilters = {}, {}
     local selectedSpecificFish = "Any"
     local targetFishInput = ""
-    local FishDropdown = AutofarmGroup:AddDropdown('TargetFish', { Values = getUniqueFishes(), Default = 1, Text = 'Target Fish', Callback = function(v) selectedSpecificFish = v end })
 
-    local isRefreshing = false
-    local function refreshFishList()
-        if isRefreshing then return end
-        isRefreshing = true
-        task.delay(0.5, function() pcall(function() FishDropdown:SetValues(getUniqueFishes()) end); isRefreshing = false end)
-    end
-    Fish.ChildAdded:Connect(refreshFishList)
-    Fish.ChildRemoved:Connect(refreshFishList)
-
+    AutofarmGroup:AddToggle('TNTSpoof', { Text = 'Instant Catch (TNT Spoof)', Default = false, Callback = function(v) tntSpoofEnabled = v end })
+    AutofarmGroup:AddToggle('AutoFarm', { Text = 'Teleport Autofarm', Default = false, Callback = function(v) autoFarmEnabled = v end })
+    AutofarmGroup:AddDropdown('TargetFish', { Values = {"Any"}, Default = 1, Multi = false, Text = 'Target Fish', Callback = function(v) selectedSpecificFish = v end })
     AutofarmGroup:AddInput('ManualFish', { Text = 'Manual Name Filter', Default = '', Callback = function(v) targetFishInput = v end })
-    local selectedMutationFilters = {}
-    AutofarmGroup:AddDropdown('MutationFilter', { Values = {"None","Silver","Gold","Rainbow","Dry","Frozen","Shocked","Chocolate","Infected","Magma","Evil","Yinyang","Hacker","Taco","Galaxy"}, Default = 1, Multi = true, Text = 'Mutation Filter', Callback = function(v) selectedMutationFilters = v end })
-    local selectedRarityFilters = {}
-    AutofarmGroup:AddDropdown('RarityFilter', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Default = 1, Multi = true, Text = 'Rarity Filter', Callback = function(v) selectedRarityFilters = v end })
 
-    local autoFarmEnabled = false
-    AutofarmGroup:AddToggle('AutoFarm', { Text = 'Enable Autofarm', Default = false, Callback = function(v) autoFarmEnabled = v end })
+    local FiltersGroup = AutofarmTab:AddRightGroupbox('Filters')
+    FiltersGroup:AddDropdown('MutationFilter', { Values = MutationTypes, Default = 1, Multi = true, Text = 'Mutation Filter', Callback = function(v) selectedMutationFilters = v end })
+    FiltersGroup:AddDropdown('RarityFilter', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Default = 1, Multi = true, Text = 'Rarity Filter', Callback = function(v) selectedRarityFilters = v end })
 
+    -- TNT Spoof Loop
     task.spawn(function()
         while true do
             task.wait(0.5)
+            if tntSpoofEnabled then
+                pcall(function()
+                    local Client = require(player.PlayerScripts:WaitForChild("Client"))
+                    local fishesToNuke = {}
+                    local myPos = player.Character and player.Character:GetPivot().Position
+                    if myPos then
+                        for _, v in pairs(CollectionService:GetTagged("SpawnedFish")) do
+                            if v:IsA("Model") and v.Parent and not v:GetAttribute("Claimed") then
+                                if (v:GetPivot().Position - myPos).Magnitude <= 150 then
+                                    local mut, rar = getFishData(v)
+                                    if checkFilters(mut, rar, selectedMutationFilters, selectedRarityFilters) then
+                                        table.insert(fishesToNuke, v)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    if #fishesToNuke > 0 then Client.Network.Fire("TNTActivated", fishesToNuke) end
+                end)
+            end
+        end
+    end)
+
+    -- Teleport Loop
+    task.spawn(function()
+        while true do
+            task.wait(0.1)
             if autoFarmEnabled then
-                for _, v in pairs(Fish:GetChildren()) do
+                for _, v in pairs(CollectionService:GetTagged("SpawnedFish")) do
                     if not autoFarmEnabled then break end
-                    if v:IsA("Model") then
-                        local nameMatch = (selectedSpecificFish == "Any" and targetFishInput == "") or
-                            (selectedSpecificFish ~= "Any" and v.Name == selectedSpecificFish) or
-                            (targetFishInput ~= "" and string.find(v.Name:lower(), targetFishInput:lower()))
+                    if v:IsA("Model") and v.Parent and not v:GetAttribute("Claimed") then
+                        local nameMatch = (selectedSpecificFish == "Any" and targetFishInput == "") or (selectedSpecificFish ~= "Any" and v.Name == selectedSpecificFish) or (targetFishInput ~= "" and string.find(v.Name:lower(), targetFishInput:lower()))
                         if nameMatch then
                             local mut, rar = getFishData(v)
                             if checkFilters(mut, rar, selectedMutationFilters, selectedRarityFilters) then
-                                local root = v:FindFirstChild("RootPart") or v:WaitForChild("RootPart", 2)
-                                local prompt = root and root:FindFirstChildOfClass("ProximityPrompt")
+                                local prompt = v:FindFirstChildOfClass("ProximityPrompt", true)
                                 if prompt and prompt.Enabled then
                                     local char = player.Character
-                                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                                    if hrp then
-                                        hrp.AssemblyLinearVelocity = Vector3.zero
-                                        char:PivotTo(root.CFrame * CFrame.new(0,3,0))
-                                        task.wait(0.2)
+                                    if char and char.PrimaryPart then
+                                        local targetPos = getPredictedPosition(v)
+                                        char.PrimaryPart.AssemblyLinearVelocity = Vector3.zero
+                                        char:PivotTo(CFrame.new(targetPos) * CFrame.new(0,3,0))
+                                        task.wait(0.1)
                                         if autoFarmEnabled then pcall(function() fireproximityprompt(prompt) end) end
-                                        task.wait(0.5)
+                                        task.wait(0.2)
                                     end
                                 end
                             end
@@ -278,7 +303,7 @@ return function(Window, ESP, Library)
         fishEspEnabled = v
         if not v then for _, f in pairs(Fish:GetChildren()) do pcall(function() ESP:Remove(f) end) end end
     end })
-    FishEspGroup:AddDropdown('EspMutFilter', { Values = {"None","Silver","Gold","Rainbow","Dry","Frozen","Shocked","Chocolate","Infected","Magma","Evil","Yinyang","Hacker","Taco","Galaxy"}, Default = 1, Multi = true, Text = 'Mutation Filter', Callback = function(v) espMFilters = v end })
+    FishEspGroup:AddDropdown('EspMutFilter', { Values = MutationTypes, Default = 1, Multi = true, Text = 'Mutation Filter', Callback = function(v) espMFilters = v end })
     FishEspGroup:AddDropdown('EspRarFilter', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Default = 1, Multi = true, Text = 'Rarity Filter', Callback = function(v) espRFilters = v end })
 
     local function addFishEsp(f)
@@ -293,45 +318,22 @@ return function(Window, ESP, Library)
             end
         end)
     end
-
     Fish.ChildAdded:Connect(function(f) task.wait(0.5); addFishEsp(f) end)
     Fish.ChildRemoved:Connect(function(f) pcall(function() ESP:Remove(f) end) end)
-
-    local function refreshFishEsp()
-        for _, f in pairs(Fish:GetChildren()) do
-            if fishEspEnabled then addFishEsp(f) else pcall(function() ESP:Remove(f) end) end
-        end
-    end
-    FishEspGroup:AddButton({ Text = 'Refresh Filter', Func = refreshFishEsp })
+    FishEspGroup:AddButton({ Text = 'Refresh Filter', Func = function()
+        for _, f in pairs(Fish:GetChildren()) do if fishEspEnabled then addFishEsp(f) else pcall(function() ESP:Remove(f) end) end end
+    end })
 
     local AreaEspGroup = VisualsTab:AddRightGroupbox('Area ESP')
     local areaEspEnabled = false
-
     AreaEspGroup:AddToggle('AreaEsp', { Text = 'Enable Area ESP', Default = false, Callback = function(v)
         areaEspEnabled = v
-        if not v then
-            for _, m in pairs(Markers:GetChildren()) do pcall(function() ESP:Remove(m) end) end
-        else
-            for _, m in pairs(Markers:GetChildren()) do
-                if not ESP.Objects[m] then
-                    pcall(function() ESP:Add(m, { Name="[Zone] "..m.Name, Color=Color3.fromRGB(0,150,255), TextOnly=true, IsEnabled=function() return areaEspEnabled end }) end)
-                end
-            end
-        end
+        if not v then for _, m in pairs(Markers:GetChildren()) do pcall(function() ESP:Remove(m) end) end
+        else for _, m in pairs(Markers:GetChildren()) do if not ESP.Objects[m] then pcall(function() ESP:Add(m, { Name="[Zone] "..m.Name, Color=Color3.fromRGB(0,150,255), TextOnly=true, IsEnabled=function() return areaEspEnabled end }) end) end end end
     end })
 
-    Markers.ChildAdded:Connect(function(m)
-        task.wait(0.5)
-        if areaEspEnabled and not ESP.Objects[m] then
-            pcall(function() ESP:Add(m, { Name="[Zone] "..m.Name, Color=Color3.fromRGB(0,150,255), TextOnly=true, IsEnabled=function() return areaEspEnabled end }) end)
-        end
-    end)
-    Markers.ChildRemoved:Connect(function(m) pcall(function() ESP:Remove(m) end) end)
-
     local function firePacket(id, hasResponse)
-        pcall(function()
-            RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring(string.char(id)..(hasResponse and "\001" or "")))
-        end)
+        pcall(function() RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring(string.char(id)..(hasResponse and "\001" or ""))) end)
     end
 
     local MiscGroup = MiscTab:AddLeftGroupbox('Utilities')
@@ -344,40 +346,52 @@ return function(Window, ESP, Library)
     MiscGroup:AddToggle('AutoSpin', { Text = 'Auto Spin Wheel', Default = false, Callback = function(v) autoSpin = v end })
     task.spawn(function() while true do task.wait(10); if autoSpin then firePacket(19, true) end end end)
 
+    MiscGroup:AddButton({ Text = 'Remote Sell All', Func = function()
+        pcall(function()
+            local Client = require(player.PlayerScripts:WaitForChild("Client"))
+            local res = Client.Network.Invoke("SellInventory")
+            Library:Notify("Sold inventory for $" .. tostring(res or 0))
+        end)
+    end })
+
+    local autoClaimBloop = false
+    MiscGroup:AddToggle('AutoClaimBloop', { Text = 'Auto-Claim Bloop Quest', Default = false, Callback = function(v) autoClaimBloop = v end })
+    task.spawn(function()
+        while true do
+            task.wait(10)
+            if autoClaimBloop then
+                pcall(function()
+                    local Client = require(player.PlayerScripts:WaitForChild("Client"))
+                    local st = Client.Network.Invoke("GetBloopQuestState")
+                    if st and st.AllCompleted and not st.SkinClaimed then
+                        Client.Network.Invoke("ClaimBloopQuest")
+                        Library:Notify("Bloop Aquarium Skin claimed!")
+                    end
+                end)
+            end
+        end
+    end)
 
     local ScheduleGroup = MiscTab:AddRightGroupbox('Spawn Schedule')
     local MermaidLabel = ScheduleGroup:AddLabel('Next Mermaid: Loading...')
     local BloopLabel   = ScheduleGroup:AddLabel('Next Bloop: Loading...')
-
-    local MermaidModule = require(RS.Modules.MermaidSpawnSchedule)
-    local BloopModule   = require(RS.Modules.BloopSpawnSchedule)
-
     task.spawn(function()
+        local MM = require(RS.Modules.MermaidSpawnSchedule)
+        local BM = require(RS.Modules.BloopSpawnSchedule)
         while true do
             local now = os.time()
             pcall(function()
-                local nextM = MermaidModule.NextMermaidSpawn(now)
-                if nextM then
-                    local d = nextM - now
-                    MermaidLabel:SetText(string.format("Next Mermaid: %02d:%02d:%02d", math.floor(d/3600), math.floor((d%3600)/60), d%60))
-                end
-
-                local nextB = BloopModule.NextBloopSpawn(now)
-                if nextB then
-                    local d = nextB - now
-                    BloopLabel:SetText(string.format("Next Bloop: %02d:%02d:%02d", math.floor(d/3600), math.floor((d%3600)/60), d%60))
-                end
+                local nm = MM.NextMermaidSpawn(now)
+                if nm then MermaidLabel:SetText(string.format("Next Mermaid: %02d:%02d:%02d", math.floor((nm-now)/3600), math.floor(((nm-now)%3600)/60), (nm-now)%60)) end
+                local nb = BM.NextBloopSpawn(now)
+                if nb then BloopLabel:SetText(string.format("Next Bloop: %02d:%02d:%02d", math.floor((nb-now)/3600), math.floor(((nb-now)%3600)/60), (nb-now)%60)) end
             end)
             task.wait(1)
         end
     end)
 
     local ShopGroup = MiscTab:AddLeftGroupbox('Auto Shop')
-    local function fireBuy(store, item)
-        pcall(function()
-            RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring(string.char(4)..string.char(#store)..store..string.char(#item)..item))
-        end)
-    end
+    local function fireBuy(store, item) pcall(function() RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring(string.char(4)..string.char(#store)..store..string.char(#item)..item)) end) end
     local autoBuyTreats, autoBuyTools = false, false
     ShopGroup:AddToggle('AutoBuyTreats', { Text = 'Auto Buy Treats', Default = false, Callback = function(v) autoBuyTreats = v end })
     ShopGroup:AddToggle('AutoBuyTools',  { Text = 'Auto Buy Tools',  Default = false, Callback = function(v) autoBuyTools  = v end })
@@ -438,9 +452,7 @@ return function(Window, ESP, Library)
                     for _, c in pairs(tool:GetChildren()) do
                         if c:IsA("BasePart") then
                             local bgui = c:FindFirstChild("BillboardGui")
-                            if bgui and bgui:FindFirstChild("Frame") and bgui.Frame:FindFirstChild("Rarity") then
-                                rarity = bgui.Frame.Rarity.Text:gsub("<[^>]+>",""); break
-                            end
+                            if bgui and bgui:FindFirstChild("Frame") and bgui.Frame:FindFirstChild("Rarity") then rarity = bgui.Frame.Rarity.Text:gsub("<[^>]+>",""); break end
                         end
                     end
                     if rarity == "Normal" then rarity = tool.Name:match("%[(.-)%]") or "Normal" end
