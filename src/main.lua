@@ -53,7 +53,8 @@ end
 local ESP = loadFile("src/util/Esp.lua")
 
 local supportedGames = {
-    [131756752872026] = "src/games/divedown.lua",
+    [15324461939] = "src/games/divedown.lua", 
+    [18512141544] = "src/games/divedown.lua", 
 }
 
 local gamePath = supportedGames[game.PlaceId]
@@ -61,7 +62,7 @@ if gamePath then
     local gameScript = loadFile(gamePath)
     if gameScript then
         task.spawn(function()
-            gameScript(Window, ESP)
+            gameScript(Window, ESP, Library)
         end)
     end
 end
@@ -89,7 +90,7 @@ local function setupPlayer(plr)
             if char and char.Parent then
                 ESP:Add(char, {
                     Name = plr.Name,
-                    IsEnabled = function() return plr.Character == char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 end
+                    IsEnabled = function() return ESP.Enabled and plr.Character == char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 end
                 })
             end
         end)

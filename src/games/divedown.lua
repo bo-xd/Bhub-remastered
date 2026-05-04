@@ -1,4 +1,4 @@
-return function(Window, ESP)
+return function(Window, ESP, Library)
     local player = game:GetService("Players").LocalPlayer
 
     local OceanTab = Window:AddTab('Ocean')
@@ -101,6 +101,7 @@ return function(Window, ESP)
                             local hrp = char:FindFirstChild("HumanoidRootPart")
                             if hrp then hrp.Velocity = Vector3.new(0,0,0) end
                             char:PivotTo(CFrame.new(HardcodedZones[zone]) * CFrame.new(0,5,0))
+                            Library:Notify("Auto-teleported to rare spawn in " .. zone)
                         end
                     end
                 end
@@ -296,7 +297,7 @@ return function(Window, ESP)
     ShopGroup:AddToggle('AutoBuyTools', { Text = 'Auto Buy Tools', Default = false, Callback = function(v) autoBuyTools = v end })
     task.spawn(function()
         while true do
-            task.wait(3)
+            task.wait(5)
             if not autoBuyTreats and not autoBuyTools then continue end
             pcall(function()
                 local pUI = player.PlayerGui:FindFirstChild("PersistentUI")
@@ -308,9 +309,18 @@ return function(Window, ESP)
                     local sf = s and s:FindFirstChild("Content") and s.Content:FindFirstChild("ScrollingFrame")
                     if not sf then return end
                     for _, item in pairs(sf:GetChildren()) do
+                        if not enabled then break end
+                        if not item:IsA("Frame") or item.Name == "UIListLayout" then continue end
                         local slot = item:FindFirstChild("SlotTemplate")
-                        local stock = slot and slot:FindFirstChild("StockAmount") and tonumber(string.match(slot.StockAmount.Text, "%d+")) or 0
-                        for i = 1, stock do if not enabled then break end fireBuy(shopName, item.Name) task.wait(0.1) end
+                        local stockTxt = slot and slot:FindFirstChild("StockAmount") and slot.StockAmount.Text or "0"
+                        local stock = tonumber(string.match(stockTxt, "%d+")) or 0
+                        if stock > 0 then
+                            for i = 1, stock do 
+                                if not enabled then break end 
+                                fireBuy(shopName, item.Name) 
+                                task.wait(0.15) 
+                            end
+                        end
                     end
                 end
                 buyFromShop("Treat", autoBuyTreats)

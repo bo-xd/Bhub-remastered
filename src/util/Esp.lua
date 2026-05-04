@@ -116,11 +116,7 @@ function ESP:Update()
 			continue
 		end
 
-		local cf = espData.PrimaryPart.CFrame
-		local size = espData.Size
-		
 		local rootPos = espData.PrimaryPart.Position
-		
 		local topPos, onScreenTop = Camera:WorldToViewportPoint(rootPos + Vector3.new(0, 3, 0))
 		local bottomPos, onScreenBottom = Camera:WorldToViewportPoint(rootPos - Vector3.new(0, 3, 0))
 		
@@ -134,11 +130,7 @@ function ESP:Update()
 			local textColor = espData.Color or self.TextColor
 			
 			if espData.TextOnly then
-				espData.Components.BoxOutline.Visible = false
-				espData.Components.Box.Visible = false
-				espData.Components.HealthBarOutline.Visible = false
-				espData.Components.HealthBar.Visible = false
-				espData.Components.Tracer.Visible = false
+				for _, c in pairs(espData.Components) do c.Visible = false end
 				
 				espData.Components.Name.Visible = true
 				espData.Components.Name.Text = espData.Name
@@ -151,8 +143,6 @@ function ESP:Update()
 					espData.Components.Distance.Text = string.format("%d studs", dist)
 					espData.Components.Distance.Position = Vector2.new(topPos.X, topPos.Y + self.TextSize + 2)
 					espData.Components.Distance.Color = textColor
-				else
-					espData.Components.Distance.Visible = false
 				end
 			else
 				if self.ShowBoxes then
@@ -209,15 +199,10 @@ function ESP:Update()
 				
 				if self.ShowTracers then
 					local origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-					
-					if self.TracerOrigin == "Top" then
-						origin = Vector2.new(Camera.ViewportSize.X / 2, 0)
-					elseif self.TracerOrigin == "Middle" then
-						origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-					elseif self.TracerOrigin == "Mouse" then
-						origin = game:GetService("UserInputService"):GetMouseLocation()
-					end
-	
+					if self.TracerOrigin == "Top" then origin = Vector2.new(Camera.ViewportSize.X / 2, 0)
+					elseif self.TracerOrigin == "Middle" then origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+					elseif self.TracerOrigin == "Mouse" then origin = game:GetService("UserInputService"):GetMouseLocation() end
+
 					espData.Components.Tracer.Visible = true
 					espData.Components.Tracer.From = origin
 					espData.Components.Tracer.To = Vector2.new(x + width/2, y + height)
