@@ -87,7 +87,6 @@ return function(Window, ESP, Library)
         end)
     end)
 
-    -- [[ MODIFIERS TAB ]]
     local ProtectionGroup = OceanTab:AddRightGroupbox('Modifiers')
     local antiDrownEnabled, teleporting = false, false
     ProtectionGroup:AddToggle('AntiDrown', { Text = 'Anti Drown', Default = false, Callback = function(v)
@@ -181,7 +180,11 @@ return function(Window, ESP, Library)
 
     -- [[ VISUALS TAB ]]
     local fishEspEnabled, areaEspEnabled = false, false
-    VisualsTab:AddLeftGroupbox('Fish ESP'):AddToggle('FishEsp', { Text = 'Enable Fish ESP', Default = false, Callback = function(v) fishEspEnabled = v end })
+    local espMFilters, espRFilters = {}, {}
+    local EspMain = VisualsTab:AddLeftGroupbox('Fish ESP')
+    EspMain:AddToggle('FishEsp', { Text = 'Enable Fish ESP', Default = false, Callback = function(v) fishEspEnabled = v end })
+    EspMain:AddDropdown('EspMutF', { Values = MutationTypes, Default = "Normal", Multi = true, Text = 'ESP Mutation Filter', Callback = function(v) espMFilters = v end })
+    EspMain:AddDropdown('EspRarF', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Default = "Normal", Multi = true, Text = 'ESP Rarity Filter', Callback = function(v) espRFilters = v end })
     VisualsTab:AddRightGroupbox('Area ESP'):AddToggle('AreaEsp', { Text = 'Enable Area ESP', Default = false, Callback = function(v) areaEspEnabled = v end })
 
     task.spawn(function()
@@ -191,7 +194,7 @@ return function(Window, ESP, Library)
                 for _, f in pairs(Fish:GetChildren()) do
                     if f:IsA("Model") and f.Parent and not f:GetAttribute("Claimed") then
                         local m, r = getFishData(f)
-                        if checkFilters(m, r, mFilters, rFilters) then
+                        if checkFilters(m, r, espMFilters, espRFilters) then
                             if not ESP.Objects[f] then ESP:Add(f, { Name = f.Name .. " [" .. m .. "]", Color = Color3.fromRGB(255, 255, 255), IsEnabled = function() return fishEspEnabled and f.Parent ~= nil end }) end
                         else pcall(function() ESP:Remove(f) end) end
                     end
@@ -208,10 +211,31 @@ return function(Window, ESP, Library)
 
     -- [[ MISC TAB ]]
     local MiscUtils = MiscTab:AddLeftGroupbox('Utilities')
+    local TimerLabel = MiscUtils:AddLabel('Timers Loading...')
+    task.spawn(function()
+        local Schedule = require(RS.Modules.SpawnSchedules)
+        while true do
+            task.wait(1)
+            local function getT(id) local s = Schedule[id] or {NextSpawn=0}; return math.max(0, math.floor(s.NextSpawn - os.time())) end
+            TimerLabel:SetText(string.format("Bloop: %ds | Mermaid: %ds", getT("Bloop"), getT("Mermaid")))
+        end
+    end)
+
+    local ValueLabel = MiscUtils:AddLabel('Backpack Value: $0')
+    task.spawn(function()
+        local Earnings = require(RS.Modules.FishEarnings)
+        while true do
+            task.wait(1)
+            local total = 0
+            for _, f in pairs(player:GetAttribute("BackpackFish") or {}) do total = total + (Earnings[f] or 0) end
+            ValueLabel:SetText("Backpack Value: $" .. total)
+        end
+    end)
+
     MiscUtils:AddButton({ Text = 'Spin Wheel', Func = function() RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\019\001")) end })
-    MiscUtils:AddButton({ Text = 'Remote Sell All', Func = function() RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\003\001")) end })
     MiscUtils:AddButton({ Text = 'Instant Respawn', Func = function() RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\007")) end })
-    MiscUtils:AddButton({ Text = 'Cancel Death Screen', Func = function() RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\013")) end })
+    MiscUtils:AddButton({ Text = 'Weather Machine', Func = function() RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\024")) end })
+    MiscUtils:AddButton({ Text = 'Rainbow Machine', Func = function() RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\025")) end })
     
     local autoShopTreats, autoShopTools = false, false
     local ShopGroup = MiscTab:AddRightGroupbox('Auto Shop')
@@ -230,5 +254,5 @@ return function(Window, ESP, Library)
     AqGroup:AddButton({ Text = 'Equip Best Fish', Func = function() require(player.PlayerScripts.Client).Network.Invoke("RequestEquipBestFish") end })
     AqGroup:AddDropdown('SellRarity', { Values = {"Common", "Rare", "Epic", "Legendary", "Mythical"}, Default = "Common", Multi = false, Text = 'Smart Sell Rarity', Callback = function(v) require(player.PlayerScripts.Client).Network.Invoke("SellFishByRarity", v) end })
 
-    Library:Notify("MASTER SUITE FULLY RESTORED.", 5)
+    Library:Notify("INDEPENDENT FILTERS LOADED.", 5)
 end
