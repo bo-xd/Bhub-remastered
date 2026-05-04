@@ -13,8 +13,9 @@ return function(Window, ESP, Library)
     local Fish        = game_folder:WaitForChild("Fishes")
     local Markers     = game_folder:WaitForChild("OceanZoneMarkers")
 
-    -- [[ DATA TABLES ]]
+    -- [[ DATA ]]
     local MutationTypes = {"Normal","Silver","Gold","Rainbow","Frozen","Shocked","Magma","Chocolate","Dry","Infected","Evil","YinYang","Hacker","Galaxy","Taco"}
+    local ZoneOrder = {"SunlightZone","Area1","Area2","CoralReef","TwilightZone","Area3","DeepOcean","TheDeepDark","TheTrenches","Atlantis","AquaForest","ShellReef","KrakenWorld","MegalodonsLair","IceArea","JellyfishFields","SteampunkZone","DeadWaters","Prehistoric"}
     local HardcodedZones = {
         ["SunlightZone"]   = Vector3.new(-1935.5, 2466.8, -1420.5),
         ["Area1"]          = Vector3.new(-1934.9, 2447.1, -1429.0),
@@ -36,7 +37,6 @@ return function(Window, ESP, Library)
         ["DeadWaters"]     = Vector3.new(-1927.7,-3361.3, -1418.6),
         ["Prehistoric"]    = Vector3.new(-1927.7,-3820.8, -1418.6),
     }
-    local ZoneOrder = {"SunlightZone","Area1","Area2","CoralReef","TwilightZone","Area3","DeepOcean","TheDeepDark","TheTrenches","Atlantis","AquaForest","ShellReef","KrakenWorld","MegalodonsLair","IceArea","JellyfishFields","SteampunkZone","DeadWaters","Prehistoric"}
 
     -- [[ HELPERS ]]
     local function getFishData(fish)
@@ -70,7 +70,13 @@ return function(Window, ESP, Library)
     -- [[ OCEAN TAB ]]
     local TeleportGroup = OceanTab:AddLeftGroupbox('Teleportation')
     local selectedAreaName = ZoneOrder[1]
-    TeleportGroup:AddDropdown('AreaSelector', { Values = ZoneOrder, Default = 1, Text = 'Target Area', Callback = function(v) selectedAreaName = v end })
+    TeleportGroup:AddDropdown('AreaSelector', {
+        Values = ZoneOrder,
+        Default = ZoneOrder[1],
+        Multi = false,
+        Text = 'Target Area',
+        Callback = function(v) selectedAreaName = v end
+    })
     TeleportGroup:AddButton({ Text = 'Teleport', Func = function() if HardcodedZones[selectedAreaName] then player.Character:PivotTo(CFrame.new(HardcodedZones[selectedAreaName])) end end })
     TeleportGroup:AddButton({ Text = 'Teleport Back (Aquarium)', Func = function() pcall(function() workspace.Network["Teleport-RemoteEvent"]:FireServer("Aquarium") end) end })
 
@@ -113,7 +119,16 @@ return function(Window, ESP, Library)
     local ghostMode = false
     ProtectionGroup:AddToggle('GhostMode', { Text = 'Ghost Mode (Noclip)', Default = false, Callback = function(v) ghostMode = v end })
     task.spawn(function() game:GetService("RunService").Stepped:Connect(function() if ghostMode and player.Character then for _,v in pairs(player.Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide=false end end end end) end)
-    ProtectionGroup:AddSlider('SwimSpeed', { Text = 'Swim Speed', Min = 1, Max = 100, Default = 1, Rounding = 1, Callback = function(v) workspace:SetAttribute("AdminSpeedMultiplier", v) end })
+
+    ProtectionGroup:AddSlider('SwimSpeed', {
+        Text = 'Swim Speed',
+        Min = 1,
+        Max = 100,
+        Default = 1,
+        Rounding = 1,
+        Compact = false,
+        Callback = function(v) workspace:SetAttribute("AdminSpeedMultiplier", v) end
+    })
 
     -- [[ AUTOFARM TAB ]]
     local FarmGroup = AutofarmTab:AddLeftGroupbox('Farming')
@@ -125,7 +140,13 @@ return function(Window, ESP, Library)
     FarmGroup:AddToggle('AutoFarm', { Text = 'Teleport Farm', Default = false, Callback = function(v) autofarmEnabled = v end })
     FarmGroup:AddToggle('AutoSell', { Text = 'Auto Sell', Default = false, Callback = function(v) autoSellEnabled = v end })
 
-    local FishDrop = FarmGroup:AddDropdown('TargetFish', { Values = {"Any"}, Default = 1, Multi = false, Text = 'Specific Fish', Callback = function(v) selectedSpecificFish = v end })
+    local FishDrop = FarmGroup:AddDropdown('TargetFish', {
+        Values = {"Any"},
+        Default = "Any",
+        Multi = false,
+        Text = 'Specific Fish',
+        Callback = function(v) selectedSpecificFish = v end
+    })
     FarmGroup:AddButton({ Text = 'Refresh Fish List', Func = function()
         local list = {"Any"}
         for _, v in pairs(CollectionService:GetTagged("SpawnedFish")) do if not table.find(list, v.Name) then table.insert(list, v.Name) end end
@@ -134,8 +155,8 @@ return function(Window, ESP, Library)
     FarmGroup:AddInput('ManualFish', { Text = 'Manual Name Filter', Default = '', Callback = function(v) targetFishInput = v end })
 
     local FilterGroup = AutofarmTab:AddRightGroupbox('Filters')
-    FilterGroup:AddDropdown('MutF', { Values = MutationTypes, Default = 1, Multi = true, Text = 'Mutation Filter', Callback = function(v) mFilters = v end })
-    FilterGroup:AddDropdown('RarF', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Default = 1, Multi = true, Text = 'Rarity Filter', Callback = function(v) rFilters = v end })
+    FilterGroup:AddDropdown('MutF', { Values = MutationTypes, Default = MutationTypes[1], Multi = true, Text = 'Mutation Filter', Callback = function(v) mFilters = v end })
+    FilterGroup:AddDropdown('RarF', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Default = "Normal", Multi = true, Text = 'Rarity Filter', Callback = function(v) rFilters = v end })
 
     -- LOOPS
     task.spawn(function()
@@ -207,5 +228,5 @@ return function(Window, ESP, Library)
     local AqGroup = AquariumTab:AddLeftGroupbox('Aquarium')
     AqGroup:AddButton({ Text = 'Equip Best Fish', Func = function() require(player.PlayerScripts.Client).Network.Invoke("RequestEquipBestFish") end })
 
-    Library:Notify("ALL TABS RESTORED.", 5)
+    Library:Notify("MASTER COMPLIANCE FIX LOADED.", 5)
 end
