@@ -28,7 +28,7 @@ local function loadFile(path)
     end
 
     local url = string.format("https://raw.githubusercontent.com/%s/%s/%s", REPO, BRANCH, path)
-    local req = (syn and syn.request) or (http and http.request) or http_request or request
+    local req = (http and http.request) or http_request or request
     
     if req then
         local response = req({
@@ -119,7 +119,7 @@ MenuGroup:AddButton({
     end
 })
 
-MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'End', NoUI = true, Text = 'Menu keybind' })
+MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'Delete', NoUI = true, Text = 'Menu keybind' })
 task.spawn(function()
     while not Options.MenuKeybind do task.wait() end
     Library.ToggleKeybind = Options.MenuKeybind
