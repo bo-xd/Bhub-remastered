@@ -65,7 +65,9 @@ return function(Window, Tabs, ESP)
     TeleportGroup:AddButton({
         Text = 'Teleport Back',
         Func = function()
-            workspace:WaitForChild("Network"):WaitForChild("Teleport-RemoteEvent"):FireServer("Aquarium")
+            local net = workspace:FindFirstChild("Network")
+            local rem = net and net:FindFirstChild("Teleport-RemoteEvent")
+            if rem then rem:FireServer("Aquarium") end
         end
     })
 
@@ -95,7 +97,6 @@ return function(Window, Tabs, ESP)
                             local hrp = char:FindFirstChild("HumanoidRootPart")
                             if hrp then hrp.Velocity = Vector3.new(0,0,0) end
                             char:PivotTo(CFrame.new(HardcodedZones[zone]) * CFrame.new(0, 5, 0))
-                            Library:Notify("Rare Spawn: " .. zone)
                         end
                     end
                 end
@@ -121,9 +122,13 @@ return function(Window, Tabs, ESP)
                             local character = player.Character
                             if character and character:FindFirstChild("HumanoidRootPart") then
                                 local savedCF = character.HumanoidRootPart.CFrame
-                                workspace:WaitForChild("Network"):WaitForChild("Teleport-RemoteEvent"):FireServer("Aquarium")
-                                task.wait(0.5)
-                                character:PivotTo(savedCF)
+                                local net = workspace:FindFirstChild("Network")
+                                local rem = net and net:FindFirstChild("Teleport-RemoteEvent")
+                                if rem then 
+                                    rem:FireServer("Aquarium")
+                                    task.wait(0.5)
+                                    character:PivotTo(savedCF)
+                                end
                             end
                             task.wait(1)
                             teleporting = false
@@ -246,6 +251,7 @@ return function(Window, Tabs, ESP)
                     if f:IsA("Model") and not ESP.Objects[f] then
                         ESP:Add(f, {
                             Name = f.Name,
+                            PrimaryPart = f:FindFirstChild("RootPart") or f.PrimaryPart,
                             IsEnabled = function() return fishEspEnabled and f.Parent == Fish end
                         })
                     end
@@ -259,7 +265,10 @@ return function(Window, Tabs, ESP)
     local function firePacket(id, hasResponse)
         pcall(function()
             local str = string.char(id) .. (hasResponse and "\001" or "")
-            game:GetService("ReplicatedStorage").Packets.Packet.RemoteEvent:FireServer(buffer.fromstring(str))
+            local net = game:GetService("ReplicatedStorage"):FindFirstChild("Packets")
+            local p = net and net:FindFirstChild("Packet")
+            local r = p and p:FindFirstChild("RemoteEvent")
+            if r then r:FireServer(buffer.fromstring(str)) end
         end)
     end
 
@@ -280,7 +289,10 @@ return function(Window, Tabs, ESP)
     local function fireBuy(store, item)
         pcall(function()
             local str = string.char(4) .. string.char(#store) .. store .. string.char(#item) .. item
-            game:GetService("ReplicatedStorage").Packets.Packet.RemoteEvent:FireServer(buffer.fromstring(str))
+            local net = game:GetService("ReplicatedStorage"):FindFirstChild("Packets")
+            local p = net and net:FindFirstChild("Packet")
+            local r = p and p:FindFirstChild("RemoteEvent")
+            if r then r:FireServer(buffer.fromstring(str)) end
         end)
     end
 
@@ -300,7 +312,8 @@ return function(Window, Tabs, ESP)
                         if treatShop then
                             for _, item in pairs(treatShop:GetChildren()) do
                                 local slot = item:FindFirstChild("SlotTemplate")
-                                local stock = slot and tonumber(string.match(slot.StockAmount.Text, "%d+")) or 0
+                                local stockText = slot and slot:FindFirstChild("StockAmount") and slot.StockAmount.Text
+                                local stock = stockText and tonumber(string.match(stockText, "%d+")) or 0
                                 if stock > 0 then
                                     fireBuy("Treat", item.Name)
                                 end
@@ -375,7 +388,10 @@ return function(Window, Tabs, ESP)
                         if smartSellFilters[rarity] then
                             tool.Parent = player.Character
                             task.wait(0.1)
-                            game:GetService("ReplicatedStorage").Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\002\001\r"), {player})
+                            local net = game:GetService("ReplicatedStorage"):FindFirstChild("Packets")
+                            local p = net and net:FindFirstChild("Packet")
+                            local r = p and p:FindFirstChild("RemoteEvent")
+                            if r then r:FireServer(buffer.fromstring("\002\001\r"), {player}) end
                             task.wait(0.2)
                         end
                     end

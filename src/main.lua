@@ -60,12 +60,9 @@ local gamePath = supportedGames[game.PlaceId]
 if gamePath then
     local gameScript = loadFile(gamePath)
     if gameScript then
-        local success, err = pcall(function()
+        pcall(function()
             gameScript(Window, {}, ESP)
         end)
-        if not success then
-            warn("Game script error: " .. tostring(err))
-        end
     end
 end
 
@@ -88,10 +85,12 @@ TracerGroup:AddDropdown('TracerOrigin', { Values = { 'Top', 'Middle', 'Bottom', 
 local function setupPlayer(plr)
     local function add(char)
         task.delay(0.5, function()
-            ESP:Add(char, {
-                Name = plr.Name,
-                IsEnabled = function() return plr.Character == char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 end
-            })
+            if char and char.Parent then
+                ESP:Add(char, {
+                    Name = plr.Name,
+                    IsEnabled = function() return plr.Character == char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 end
+                })
+            end
         end)
     end
     plr.CharacterAdded:Connect(add)
@@ -121,7 +120,11 @@ MenuGroup:AddButton({
 })
 
 MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'End', NoUI = true, Text = 'Menu keybind' })
-Library.ToggleKeybind = Options.MenuKeybind
+task.spawn(function()
+    while not Options.MenuKeybind do task.wait() end
+    Library.ToggleKeybind = Options.MenuKeybind
+end)
+
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
