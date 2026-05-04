@@ -123,9 +123,9 @@ SaveManager:LoadAutoloadConfig()
 
 task.spawn(function()
     while true do
-        task.wait(0.2)
-        if ESP then
-            ESP.MenuOpen = Library.Visible
+        task.wait(0.05)
+        if ESP and Library then
+            ESP.MenuOpen = Library.Toggled or Library.Visible or false
         end
     end
 end)

@@ -2,8 +2,15 @@ return function(Window, ESP, Library)
     local player = game:GetService("Players").LocalPlayer
     local RunService = game:GetService("RunService")
     local Lighting = game:GetService("Lighting")
-
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    
+    local Remotes = ReplicatedStorage:WaitForChild("RemoteEvents")
+    local RequestReplicateSound = Remotes:WaitForChild("RequestReplicateSound")
+    local ToolDamageObject = Remotes:WaitForChild("ToolDamageObject")
+    local PlayEnemyHitSound = Remotes:WaitForChild("PlayEnemyHitSound")
+    
     local MainTab = Window:AddTab('Survival')
+    local FarmTab = Window:AddTab('Auto Farm')
     local VisualsTab = Window:AddTab('Visuals')
     local MiscTab = Window:AddTab('Misc')
 
@@ -28,58 +35,73 @@ return function(Window, ESP, Library)
         end
     end })
 
-    -- ESP Features
-    local EntityEspGroup = VisualsTab:AddLeftGroupbox('Entity ESP')
-    local entityEspEnabled = false
-    
-    EntityEspGroup:AddToggle('EntityEsp', { Text = 'Enable Entity ESP', Default = false, Callback = function(v)
-        entityEspEnabled = v
-        if not v then
-            for _, obj in pairs(workspace:GetDescendants()) do
-                if obj:IsA("Model") and ESP.Objects[obj] then
-                    ESP:Remove(obj)
-                end
-            end
-        end
-    end })
+    -- Farm Features
+    local FarmGroup = FarmTab:AddLeftGroupbox('Automations')
+    local autoWood = false
+    local autoKill = false
+    local autoCollect = false
 
-    local function isMonster(model)
-        local name = model.Name:lower()
-        return name:find("deer") or name:find("monster") or name:find("cultist") or name:find("wolf") or name:find("bear") or name:find("alpha")
-    end
+    FarmGroup:AddToggle('AutoWood', { Text = 'Auto Wood', Default = false, Callback = function(v) autoWood = v end })
+    FarmGroup:AddToggle('AutoKill', { Text = 'Auto Kill Monsters', Default = false, Callback = function(v) autoKill = v end })
+    FarmGroup:AddToggle('AutoCollect', { Text = 'Auto Collect Items', Default = false, Callback = function(v) autoCollect = v end })
 
-    local function isItem(model)
-        local name = model.Name:lower()
-        return name:find("chest") or name:find("child") or name:find("sack") or name:find("box")
+    local function getTool()
+        local inv = player:FindFirstChild("Inventory")
+        if not inv then return nil end
+        -- Prioritize Axe for Wood, or any weapon
+        return inv:FindFirstChild("Old Axe") or inv:FindFirstChildOfClass("Model") or inv:FindFirstChildOfClass("Tool")
     end
 
     task.spawn(function()
         while true do
-            task.wait(2)
-            if entityEspEnabled then
-                for _, obj in pairs(workspace:GetDescendants()) do
-                    if not entityEspEnabled then break end
-                    if obj:IsA("Model") and not ESP.Objects[obj] then
-                        local color = nil
-                        local label = nil
-                        
-                        if isMonster(obj) then
-                            color = Color3.fromRGB(255, 0, 0)
-                            label = "[Monster] " .. obj.Name
-                        elseif isItem(obj) then
-                            color = Color3.fromRGB(0, 255, 0)
-                            label = "[Item] " .. obj.Name
-                        elseif obj.Name:lower():find("campfire") then
-                            color = Color3.fromRGB(255, 165, 0)
-                            label = "[Campfire]"
+            task.wait(0.5)
+            if autoWood then
+                local tool = getTool()
+                local map = workspace:FindFirstChild("Map")
+                local foliage = map and map:FindFirstChild("Foliage")
+                if tool and foliage then
+                    for _, obj in pairs(foliage:GetChildren()) do
+                        if not autoWood then break end
+                        if obj.Name:find("Tree") and (player.Character and player.Character:FindFirstChild("Head")) then
+                            pcall(function()
+                                RequestReplicateSound:FireServer("FireAllClients", "WoodChop", { Instance = player.Character.Head, Volume = 0.4 })
+                                ToolDamageObject:InvokeServer(obj, tool, "12_4198471790", player.Character.Head.CFrame, false)
+                                PlayEnemyHitSound:FireServer("FireAllClients", obj, tool)
+                            end)
+                            task.wait(0.1)
                         end
-                        
-                        if color and label then
-                            ESP:Add(obj, { 
-                                Name = label, 
-                                Color = color, 
-                                IsEnabled = function() return entityEspEnabled and obj.Parent ~= nil end 
-                            })
+                    end
+                end
+            end
+            
+            if autoKill then
+                local tool = getTool()
+                local chars = workspace:FindFirstChild("Characters")
+                if tool and chars then
+                    for _, obj in pairs(chars:GetChildren()) do
+                        if not autoKill then break end
+                        if obj ~= player.Character and (player.Character and player.Character:FindFirstChild("Head")) then
+                            pcall(function()
+                                ToolDamageObject:InvokeServer(obj, tool, "12_4198471790", player.Character.Head.CFrame, false)
+                                PlayEnemyHitSound:FireServer("FireAllClients", obj, tool)
+                            end)
+                            task.wait(0.1)
+                        end
+                    end
+                end
+            end
+
+            if autoCollect then
+                local items = workspace:FindFirstChild("Items")
+                if items then
+                    for _, obj in pairs(items:GetChildren()) do
+                        if not autoCollect then break end
+                        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                            -- Simple collection by firing ProxPrompt if exists, or moving to it
+                            local prompt = obj:FindFirstChildOfClass("ProximityPrompt") or obj:FindFirstChild("Prompt", true)
+                            if prompt then
+                                fireproximityprompt(prompt)
+                            end
                         end
                     end
                 end
@@ -87,16 +109,54 @@ return function(Window, ESP, Library)
         end
     end)
 
-    -- Misc Features
-    local MiscGroup = MiscTab:AddLeftGroupbox('Utilities')
+    -- ESP Features
+    local EntityEspGroup = VisualsTab:AddLeftGroupbox('Entity ESP')
+    local entityEspEnabled = false
     
-    MiscGroup:AddButton({ Text = 'Kill All Monsters (Client-Side)', Func = function()
-        for _, obj in pairs(workspace:GetDescendants()) do
-            if obj:IsA("Model") and isMonster(obj) then
-                pcall(function() obj:Destroy() end)
+    EntityEspGroup:AddToggle('EntityEsp', { Text = 'Enable Entity ESP', Default = false, Callback = function(v)
+        entityEspEnabled = v
+        if not v then ESP:Clear() end
+    end })
+
+    task.spawn(function()
+        while true do
+            task.wait(2)
+            if entityEspEnabled then
+                -- Monsters
+                local chars = workspace:FindFirstChild("Characters")
+                if chars then
+                    for _, obj in pairs(chars:GetChildren()) do
+                        if obj ~= player.Character and not ESP.Objects[obj] then
+                            ESP:Add(obj, { Name = "[Monster] " .. obj.Name, Color = Color3.fromRGB(255, 0, 0), IsEnabled = function() return entityEspEnabled and obj.Parent ~= nil end })
+                        end
+                    end
+                end
+                
+                -- Items
+                local items = workspace:FindFirstChild("Items")
+                if items then
+                    for _, obj in pairs(items:GetChildren()) do
+                        if not ESP.Objects[obj] then
+                            ESP:Add(obj, { Name = "[Item] " .. obj.Name, Color = Color3.fromRGB(0, 255, 0), IsEnabled = function() return entityEspEnabled and obj.Parent ~= nil end })
+                        end
+                    end
+                end
+
+                -- Foliage/Chests
+                local map = workspace:FindFirstChild("Map")
+                local foliage = map and map:FindFirstChild("Foliage")
+                if foliage then
+                    for _, obj in pairs(foliage:GetChildren()) do
+                        if (obj.Name:find("Tree") or obj.Name:find("Chest")) and not ESP.Objects[obj] then
+                             local label = obj.Name:find("Tree") and "[Tree]" or "[Chest]"
+                             local color = obj.Name:find("Tree") and Color3.fromRGB(139, 69, 19) or Color3.fromRGB(255, 215, 0)
+                             ESP:Add(obj, { Name = label, Color = color, IsEnabled = function() return entityEspEnabled and obj.Parent ~= nil end })
+                        end
+                    end
+                end
             end
         end
-    end })
+    end)
 
     print("[BHub] 99 Nights in the Forest script loaded.")
 end

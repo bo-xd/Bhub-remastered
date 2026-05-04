@@ -113,11 +113,7 @@ function ESP:Update()
 			shouldRender = false
 		end
         
-        if self.HideWhenMenuOpen and self.MenuOpen then
-            shouldRender = false
-        end
-
-		if not shouldRender or not espData.PrimaryPart or not espData.PrimaryPart.Parent then
+        if (self.HideWhenMenuOpen and self.MenuOpen) or not shouldRender or not espData.PrimaryPart or not espData.PrimaryPart.Parent then
 			for _, component in pairs(espData.Components) do
 				component.Visible = false
 			end
