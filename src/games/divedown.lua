@@ -234,13 +234,13 @@ return function(Window, Tabs, ESP)
         end
     end)
 
-    local VisualsGroup = VisualsTab:AddLeftGroupbox('ESP Settings')
+    local FishEspGroup = VisualsTab:AddLeftGroupbox('Fish ESP')
     local fishEspEnabled = false
     local espMFilters = {}
     local espRFilters = {}
-    VisualsGroup:AddToggle('FishEsp', { Text = 'Fish ESP', Default = false, Callback = function(v) fishEspEnabled = v if not v then for _, f in pairs(Fish:GetChildren()) do ESP:Remove(f) end end end })
-    VisualsGroup:AddDropdown('EspMutFilter', { Values = {"None", "Silver", "Gold", "Rainbow", "Dry", "Frozen", "Shocked", "Chocolate", "Infected", "Magma", "Evil", "Yinyang", "Hacker", "Taco", "Galaxy"}, Multi = true, Text = 'ESP Mutation Filter', Callback = function(v) espMFilters = v end })
-    VisualsGroup:AddDropdown('EspRarFilter', { Values = {"Normal", "Common", "Rare", "Epic", "Legendary", "Mythical", "Secret", "Divine"}, Multi = true, Text = 'ESP Rarity Filter', Callback = function(v) espRFilters = v end })
+    FishEspGroup:AddToggle('FishEsp', { Text = 'Fish ESP', Default = false, Callback = function(v) fishEspEnabled = v if not v then for _, f in pairs(Fish:GetChildren()) do ESP:Remove(f) end end end })
+    FishEspGroup:AddDropdown('EspMutFilter', { Values = {"None", "Silver", "Gold", "Rainbow", "Dry", "Frozen", "Shocked", "Chocolate", "Infected", "Magma", "Evil", "Yinyang", "Hacker", "Taco", "Galaxy"}, Multi = true, Text = 'Mutation Filter', Callback = function(v) espMFilters = v end })
+    FishEspGroup:AddDropdown('EspRarFilter', { Values = {"Normal", "Common", "Rare", "Epic", "Legendary", "Mythical", "Secret", "Divine"}, Multi = true, Text = 'Rarity Filter', Callback = function(v) espRFilters = v end })
 
     task.spawn(function()
         while true do
@@ -276,8 +276,9 @@ return function(Window, Tabs, ESP)
         end
     end)
 
+    local AreaEspGroup = VisualsTab:AddRightGroupbox('Area ESP')
     local areaEspEnabled = false
-    VisualsGroup:AddToggle('AreaEsp', { Text = 'Area ESP', Default = false, Callback = function(v) 
+    AreaEspGroup:AddToggle('AreaEsp', { Text = 'Area ESP', Default = false, Callback = function(v) 
         areaEspEnabled = v 
         local markers = workspace.Game:FindFirstChild("OceanZoneMarkers")
         if not v and markers then for _, m in pairs(markers:GetChildren()) do ESP:Remove(m) end end 
