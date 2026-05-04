@@ -39,16 +39,35 @@ return function(Window, ESP, Library)
         "MegalodonsLair","IceArea","JellyfishFields","SteampunkZone","DeadWaters","Prehistoric"
     }
 
+    local MutationTypes = {"Normal","Silver","Gold","Rainbow","Frozen","Shocked","Magma","Chocolate","Dry","Infected","Evil","YinYang","Hacker","Galaxy","Taco"}
     local function getFishData(fish)
         local mut, rar = "none", "normal"
-        local bp = fish:FindFirstChild(fish.Name.."BillboardPart") or fish:WaitForChild(fish.Name.."BillboardPart", 2)
+        
+        -- 1. Check Attributes (MutationService style)
+        for _, mType in ipairs(MutationTypes) do
+            if fish:GetAttribute(mType) then
+                if mType ~= "Normal" then mut = mType:lower() end
+                break
+            end
+        end
+        
+        -- 2. Scrape BillboardGui (Fallback for Rarity or if attributes aren't loaded)
+        local bp = fish:FindFirstChild(fish.Name.."BillboardPart")
         if bp then
             local frame = bp:FindFirstChildOfClass("BillboardGui") and bp:FindFirstChildOfClass("BillboardGui"):FindFirstChild("Frame")
             if frame then
-                local mLab = frame:FindFirstChild("Mutations")
+                if mut == "none" then
+                    local mLab = frame:FindFirstChild("Mutations")
+                    if mLab then 
+                        local t = mLab.Text:gsub("<[^>]+>",""):lower():match("^%s*(.-)%s*$") 
+                        if t~="" and t~="none" then mut=t end 
+                    end
+                end
                 local rLab = frame:FindFirstChild("Rarity")
-                if mLab then local t = mLab.Text:gsub("<[^>]+>",""):lower():match("^%s*(.-)%s*$") if t~="" and t~="none" then mut=t end end
-                if rLab then local t = rLab.Text:gsub("<[^>]+>",""):lower():match("^%s*(.-)%s*$") if t~="" and t~="normal" then rar=t end end
+                if rLab then 
+                    local t = rLab.Text:gsub("<[^>]+>",""):lower():match("^%s*(.-)%s*$") 
+                    if t~="" and t~="normal" then rar=t end 
+                end
             end
         end
         return mut, rar
@@ -82,9 +101,17 @@ return function(Window, ESP, Library)
         secret=Color3.fromRGB(255,0,0),      divine=Color3.fromRGB(0,255,255),
         epic=Color3.fromRGB(255,0,150),      rare=Color3.fromRGB(0,150,255),
     }
+    local MutationColors = {
+        ["Normal"] = Color3.fromRGB(255, 255, 255), ["Dry"] = Color3.fromRGB(194, 164, 132), ["Frozen"] = Color3.fromRGB(120, 200, 255),
+        ["Shocked"] = Color3.fromRGB(245, 0, 218), ["Chocolate"] = Color3.fromRGB(123, 63, 0), ["Silver"] = Color3.fromRGB(164, 166, 166),
+        ["Gold"] = Color3.fromRGB(234, 181, 74), ["Rainbow"] = Color3.fromRGB(255, 125, 197), ["Infected"] = Color3.fromRGB(80, 255, 80),
+        ["Evil"] = Color3.fromRGB(255, 0, 5), ["Magma"] = Color3.fromRGB(255, 98, 0), ["Wet"] = Color3.fromRGB(128, 255, 255),
+        ["YinYang"] = Color3.fromRGB(200, 200, 200), ["Hacker"] = Color3.fromRGB(0, 255, 65), ["Galaxy"] = Color3.fromRGB(160, 64, 255),
+        ["Taco"] = Color3.fromRGB(255, 180, 70)
+    }
     local function fishColor(mut, rar)
         for k, c in pairs(rarityColor) do if string.find(rar, k) then return c end end
-        if mut ~= "none" then return Color3.fromRGB(255,255,0) end
+        for k, c in pairs(MutationColors) do if mut:lower() == k:lower() and k ~= "Normal" then return c end end
         return Color3.fromRGB(150,150,150)
     end
 
@@ -317,63 +344,33 @@ return function(Window, ESP, Library)
     MiscGroup:AddToggle('AutoSpin', { Text = 'Auto Spin Wheel', Default = false, Callback = function(v) autoSpin = v end })
     task.spawn(function() while true do task.wait(10); if autoSpin then firePacket(19, true) end end end)
 
-    local ExploitGroup = MiscTab:AddRightGroupbox('Exploits')
 
-    ExploitGroup:AddButton({ Text = 'Recover Lost Items [TEST]', Func = function()
-        local inv = player:FindFirstChild("Inventory")
-        if not inv then Library:Notify("No Inventory found"); return end
-        local count = 0
-        for _, item in pairs(inv:GetChildren()) do
-            pcall(function()
-                RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring(string.char(13)..string.char(1)..item.Name))
-                count = count + 1
-            end)
-            task.wait(0.1)
-        end
-        Library:Notify("Fired RecoverItem for "..count.." items")
-    end })
+    local ScheduleGroup = MiscTab:AddRightGroupbox('Spawn Schedule')
+    local MermaidLabel = ScheduleGroup:AddLabel('Next Mermaid: Loading...')
+    local BloopLabel   = ScheduleGroup:AddLabel('Next Bloop: Loading...')
 
-    ExploitGroup:AddButton({ Text = 'Remove Weight (Better Swim)', Func = function()
-        pcall(function()
-            local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local wa = hrp:FindFirstChild("WeightAttachment")
-                if wa then wa:Destroy() end
-            end
-        end)
-    end })
+    local MermaidModule = require(RS.Modules.MermaidSpawnSchedule)
+    local BloopModule   = require(RS.Modules.BloopSpawnSchedule)
 
-    local autoRemoveWeight = false
-    ExploitGroup:AddToggle('AutoRemoveWeight', { Text = 'Auto Remove Weight', Default = false, Callback = function(v)
-        autoRemoveWeight = v
-    end })
     task.spawn(function()
         while true do
+            local now = os.time()
+            pcall(function()
+                local nextM = MermaidModule.NextMermaidSpawn(now)
+                if nextM then
+                    local d = nextM - now
+                    MermaidLabel:SetText(string.format("Next Mermaid: %02d:%02d:%02d", math.floor(d/3600), math.floor((d%3600)/60), d%60))
+                end
+
+                local nextB = BloopModule.NextBloopSpawn(now)
+                if nextB then
+                    local d = nextB - now
+                    BloopLabel:SetText(string.format("Next Bloop: %02d:%02d:%02d", math.floor(d/3600), math.floor((d%3600)/60), d%60))
+                end
+            end)
             task.wait(1)
-            if autoRemoveWeight then
-                pcall(function()
-                    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        local wa = hrp:FindFirstChild("WeightAttachment")
-                        if wa then wa:Destroy() end
-                    end
-                end)
-            end
         end
     end)
-
-    local skinNameInput = ""
-    ExploitGroup:AddInput('SkinName', { Text = 'Skin Name (exact)', Default = '', Callback = function(v) skinNameInput = v end })
-    ExploitGroup:AddButton({ Text = 'Equip Aquarium Skin', Func = function()
-        if skinNameInput == "" then Library:Notify("Enter a skin name first") return end
-        pcall(function()
-            RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\016" .. string.char(#skinNameInput) .. skinNameInput))
-            Library:Notify("Tried to equip skin: " .. skinNameInput)
-        end)
-    end })
-
-    ExploitGroup:AddButton({ Text = 'Open Weather Machine', Func = function() firePacket(8, false) end })
-    ExploitGroup:AddButton({ Text = 'Request Rainbow Machine', Func = function() firePacket(18, true) end })
 
     local ShopGroup = MiscTab:AddLeftGroupbox('Auto Shop')
     local function fireBuy(store, item)
