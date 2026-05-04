@@ -1,5 +1,6 @@
 return function(Window, ESP, Library)
     local player = game:GetService("Players").LocalPlayer
+    local RunService = game:GetService("RunService")
 
     local OceanTab = Window:AddTab('Ocean')
     local AutofarmTab = Window:AddTab('Autofarm')
@@ -39,15 +40,21 @@ return function(Window, ESP, Library)
 
     local function getFishData(fish)
         local mut, rar = "none", "normal"
-        local bp = fish:FindFirstChild(fish.Name .. "BillboardPart")
+        local bp = fish:FindFirstChild(fish.Name .. "BillboardPart") or fish:WaitForChild(fish.Name .. "BillboardPart", 2)
         if bp then
             local gui = bp:FindFirstChild("BillboardGui")
             local frame = gui and gui:FindFirstChild("Frame")
             if frame then
                 local mLab = frame:FindFirstChild("Mutations")
-                if mLab then local t = mLab.Text:gsub("<[^>]+>", ""):lower():gsub("^%s+",""):gsub("%s+$","") if t ~= "" then mut = t end end
+                if mLab then 
+                    local t = mLab.Text:gsub("<[^>]+>", ""):lower():gsub("^%s+",""):gsub("%s+$","") 
+                    if t ~= "" and t ~= "none" then mut = t end 
+                end
                 local rLab = frame:FindFirstChild("Rarity")
-                if rLab then local t = rLab.Text:gsub("<[^>]+>", ""):lower():gsub("^%s+",""):gsub("%s+$","") if t ~= "" then rar = t end end
+                if rLab then 
+                    local t = rLab.Text:gsub("<[^>]+>", ""):lower():gsub("^%s+",""):gsub("%s+$","") 
+                    if t ~= "" and t ~= "normal" then rar = t end 
+                end
             end
         end
         return mut, rar
@@ -58,12 +65,15 @@ return function(Window, ESP, Library)
         local mCount, rCount = 0, 0
         for _, v in pairs(mFilters) do if v then mCount = mCount + 1 end end
         for _, v in pairs(rFilters) do if v then rCount = rCount + 1 end end
+        
         if mCount == 0 then mutMatch = true
         elseif mFilters["None"] and (mut == "none" or mut == "normal") then mutMatch = true
         else for k, v in pairs(mFilters) do if v and string.find(mut, k:lower()) then mutMatch = true break end end end
+        
         if rCount == 0 then rarMatch = true
-        elseif rFilters["Normal"] and rar == "normal" then rarMatch = true
+        elseif rFilters["Normal"] and (rar == "normal" or rar == "") then rarMatch = true
         else for k, v in pairs(rFilters) do if v and string.find(rar, k:lower()) then rarMatch = true break end end end
+        
         return mutMatch and rarMatch
     end
 
@@ -81,11 +91,13 @@ return function(Window, ESP, Library)
         end
     end })
     TeleportGroup:AddButton({ Text = 'Teleport Back', Func = function()
-        pcall(function() workspace.Network["Teleport-RemoteEvent"]:FireServer("Aquarium") end)
+        pcall(function() workspace:WaitForChild("Network"):WaitForChild("Teleport-RemoteEvent"):FireServer("Aquarium") end)
     end })
+    
     local autoTPRareEnabled = false
     local lastTPTime = 0
     TeleportGroup:AddToggle('AutoTPRare', { Text = 'Auto TP to Rare Spawns', Default = false, Callback = function(v) autoTPRareEnabled = v end })
+    
     pcall(function()
         game:GetService("TextChatService").MessageReceived:Connect(function(msg)
             if not autoTPRareEnabled or tick() - lastTPTime < 5 then return end
@@ -123,7 +135,7 @@ return function(Window, ESP, Library)
                         local char = player.Character
                         if char and char:FindFirstChild("HumanoidRootPart") then
                             local savedCF = char.HumanoidRootPart.CFrame
-                            pcall(function() workspace.Network["Teleport-RemoteEvent"]:FireServer("Aquarium") end)
+                            pcall(function() workspace:WaitForChild("Network"):WaitForChild("Teleport-RemoteEvent"):FireServer("Aquarium") end)
                             task.wait(0.5)
                             char:PivotTo(savedCF)
                         end
@@ -163,12 +175,16 @@ return function(Window, ESP, Library)
     Fish.ChildAdded:Connect(refreshFishList)
     Fish.ChildRemoved:Connect(refreshFishList)
     AutofarmGroup:AddInput('ManualFish', { Text = 'Manual Name Filter', Default = '', Callback = function(v) targetFishInput = v end })
+    
     local selectedMutationFilters = {}
     AutofarmGroup:AddDropdown('MutationFilter', { Values = {"None","Silver","Gold","Rainbow","Dry","Frozen","Shocked","Chocolate","Infected","Magma","Evil","Yinyang","Hacker","Taco","Galaxy"}, Default = 1, Multi = true, Text = 'Mutation Filter', Callback = function(v) selectedMutationFilters = v end })
+    
     local selectedRarityFilters = {}
     AutofarmGroup:AddDropdown('RarityFilter', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Default = 1, Multi = true, Text = 'Rarity Filter', Callback = function(v) selectedRarityFilters = v end })
+    
     local autoFarmEnabled = false
     AutofarmGroup:AddToggle('AutoFarm', { Text = 'Enable Autofarm', Default = false, Callback = function(v) autoFarmEnabled = v end })
+    
     task.spawn(function()
         while true do
             task.wait(0.5)
@@ -180,7 +196,7 @@ return function(Window, ESP, Library)
                         if nameMatch then
                             local mut, rar = getFishData(v)
                             if checkFilters(mut, rar, selectedMutationFilters, selectedRarityFilters) then
-                                local root = v:FindFirstChild("RootPart")
+                                local root = v:FindFirstChild("RootPart") or v:WaitForChild("RootPart", 2)
                                 local prompt = root and root:FindFirstChildOfClass("ProximityPrompt")
                                 if prompt and prompt.Enabled then
                                     local char = player.Character
@@ -199,12 +215,17 @@ return function(Window, ESP, Library)
             end
         end
     end)
+
     local autoSellEnabled = false
     AutofarmGroup:AddToggle('AutoSell', { Text = 'Auto Sell Fish', Default = false, Callback = function(v) autoSellEnabled = v end })
     task.spawn(function()
         while true do
             task.wait(2.5)
-            if autoSellEnabled then pcall(function() game:GetService("ReplicatedStorage").Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\003\001")) end) end
+            if autoSellEnabled then 
+                pcall(function() 
+                    game:GetService("ReplicatedStorage").Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\003\001")) 
+                end) 
+            end
         end
     end)
 
@@ -217,6 +238,7 @@ return function(Window, ESP, Library)
     end })
     FishEspGroup:AddDropdown('EspMutFilter', { Values = {"None","Silver","Gold","Rainbow","Dry","Frozen","Shocked","Chocolate","Infected","Magma","Evil","Yinyang","Hacker","Taco","Galaxy"}, Default = 1, Multi = true, Text = 'Mutation Filter', Callback = function(v) espMFilters = v end })
     FishEspGroup:AddDropdown('EspRarFilter', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Default = 1, Multi = true, Text = 'Rarity Filter', Callback = function(v) espRFilters = v end })
+    
     task.spawn(function()
         while true do
             task.wait(1)
@@ -228,15 +250,22 @@ return function(Window, ESP, Library)
                         if shouldShow then
                             if not (ESP.Objects and ESP.Objects[f]) then
                                 local color = Color3.fromRGB(150,150,150)
-                                if string.find(rar,"legendary") then color = Color3.fromRGB(255,170,0)
-                                elseif string.find(rar,"mythical") then color = Color3.fromRGB(170,0,255)
-                                elseif string.find(rar,"secret") then color = Color3.fromRGB(255,0,0)
-                                elseif string.find(rar,"divine") then color = Color3.fromRGB(0,255,255)
-                                elseif string.find(rar,"epic") then color = Color3.fromRGB(255,0,150)
-                                elseif string.find(rar,"rare") then color = Color3.fromRGB(0,150,255)
+                                local lrar = rar:lower()
+                                if string.find(lrar,"legendary") then color = Color3.fromRGB(255,170,0)
+                                elseif string.find(lrar,"mythical") then color = Color3.fromRGB(170,0,255)
+                                elseif string.find(lrar,"secret") then color = Color3.fromRGB(255,0,0)
+                                elseif string.find(lrar,"divine") then color = Color3.fromRGB(0,255,255)
+                                elseif string.find(lrar,"epic") then color = Color3.fromRGB(255,0,150)
+                                elseif string.find(lrar,"rare") then color = Color3.fromRGB(0,150,255)
                                 elseif mut ~= "none" then color = Color3.fromRGB(255,255,0) end
+                                
                                 local label = f.Name .. (mut~="none" and " ["..mut.."]" or "") .. (rar~="normal" and " ["..rar.."]" or "")
-                                pcall(function() ESP:Add(f, { Name = label, PrimaryPart = f:FindFirstChild("RootPart"), Color = color, IsEnabled = function() return fishEspEnabled and f.Parent == Fish end }) end)
+                                task.spawn(function()
+                                    local root = f:FindFirstChild("RootPart") or f:WaitForChild("RootPart", 5)
+                                    if root then
+                                        ESP:Add(f, { Name = label, PrimaryPart = root, Color = color, IsEnabled = function() return fishEspEnabled and f.Parent == Fish end })
+                                    end
+                                end)
                             end
                         else
                             if ESP.Objects and ESP.Objects[f] then pcall(function() ESP:Remove(f) end) end
