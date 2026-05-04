@@ -113,7 +113,6 @@ return function(Window, ESP, Library)
     local ghostMode = false
     ProtectionGroup:AddToggle('GhostMode', { Text = 'Ghost Mode (Noclip)', Default = false, Callback = function(v) ghostMode = v end })
     task.spawn(function() game:GetService("RunService").Stepped:Connect(function() if ghostMode and player.Character then for _,v in pairs(player.Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide=false end end end end) end)
-
     ProtectionGroup:AddSlider('SwimSpeed', { Text = 'Swim Speed', Min = 1, Max = 100, Default = 1, Rounding = 1, Callback = function(v) workspace:SetAttribute("AdminSpeedMultiplier", v) end })
 
     -- [[ AUTOFARM TAB ]]
@@ -126,17 +125,17 @@ return function(Window, ESP, Library)
     FarmGroup:AddToggle('AutoFarm', { Text = 'Teleport Farm', Default = false, Callback = function(v) autofarmEnabled = v end })
     FarmGroup:AddToggle('AutoSell', { Text = 'Auto Sell', Default = false, Callback = function(v) autoSellEnabled = v end })
 
-    local FishDrop = FarmGroup:AddDropdown('TargetFish', { Values = {"Any"}, Default = 1, Text = 'Specific Fish', Callback = function(v) selectedSpecificFish = v end })
-    FarmGroup:AddButton('Refresh Fish List', function()
+    local FishDrop = FarmGroup:AddDropdown('TargetFish', { Values = {"Any"}, Default = 1, Multi = false, Text = 'Specific Fish', Callback = function(v) selectedSpecificFish = v end })
+    FarmGroup:AddButton({ Text = 'Refresh Fish List', Func = function()
         local list = {"Any"}
         for _, v in pairs(CollectionService:GetTagged("SpawnedFish")) do if not table.find(list, v.Name) then table.insert(list, v.Name) end end
         FishDrop:SetValues(list)
-    end)
+    end })
     FarmGroup:AddInput('ManualFish', { Text = 'Manual Name Filter', Default = '', Callback = function(v) targetFishInput = v end })
 
     local FilterGroup = AutofarmTab:AddRightGroupbox('Filters')
-    FilterGroup:AddDropdown('MutF', { Values = MutationTypes, Multi = true, Text = 'Mutation Filter', Callback = function(v) mFilters = v end })
-    FilterGroup:AddDropdown('RarF', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Multi = true, Text = 'Rarity Filter', Callback = function(v) rFilters = v end })
+    FilterGroup:AddDropdown('MutF', { Values = MutationTypes, Default = 1, Multi = true, Text = 'Mutation Filter', Callback = function(v) mFilters = v end })
+    FilterGroup:AddDropdown('RarF', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Default = 1, Multi = true, Text = 'Rarity Filter', Callback = function(v) rFilters = v end })
 
     -- LOOPS
     task.spawn(function()
@@ -208,5 +207,5 @@ return function(Window, ESP, Library)
     local AqGroup = AquariumTab:AddLeftGroupbox('Aquarium')
     AqGroup:AddButton({ Text = 'Equip Best Fish', Func = function() require(player.PlayerScripts.Client).Network.Invoke("RequestEquipBestFish") end })
 
-    Library:Notify("SUITE CLEANUP COMPLETE.", 5)
+    Library:Notify("ALL TABS RESTORED.", 5)
 end
