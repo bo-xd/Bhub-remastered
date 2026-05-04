@@ -5,7 +5,7 @@ local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
 local Window = Library:CreateWindow({
-    Title = 'BHub Remastered | ESP Test',
+    Title = 'BHub Remastered',
     Center = true,
     AutoShow = true,
     TabPadding = 8,
@@ -13,11 +13,9 @@ local Window = Library:CreateWindow({
 })
 
 local Tabs = {
-    Main = Window:AddTab('Main'),
+    Main = Window:AddTab('Universal'),
     ['UI Settings'] = Window:AddTab('UI Settings'),
 }
-
-local LeftGroupBox = Tabs.Main:AddLeftGroupbox('ESP Settings')
 
 local GITHUB_TOKEN = "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"
 local REPO = "bo-xd/Bhub-remastered"
@@ -54,150 +52,79 @@ local function loadFile(path)
             if success and result then return result end
         end
     end
-    
-    warn("Failed to load: " .. path)
     return nil
 end
 
 local ESP = loadFile("src/util/Esp.lua")
 
-LeftGroupBox:AddToggle('EspEnable', {
-    Text = 'Enable ESP',
-    Default = false,
-    Tooltip = 'Toggles the master ESP switch',
-    Callback = function(Value)
-        ESP.Enabled = Value
-    end
-})
+local EspGroup = Tabs.Main:AddLeftGroupbox('Universal ESP')
+EspGroup:AddToggle('EspEnable', { Text = 'Enable ESP', Default = false, Callback = function(v) ESP.Enabled = v end })
+EspGroup:AddToggle('EspBoxes', { Text = 'Show Boxes', Default = true, Callback = function(v) ESP.ShowBoxes = v end }):AddColorPicker('BoxColorPicker', { Default = Color3.new(1,1,1), Title = 'Box Color', Callback = function(v) ESP.BoxColor = v end })
+EspGroup:AddToggle('EspNames', { Text = 'Show Names', Default = true, Callback = function(v) ESP.ShowNames = v end }):AddColorPicker('TextColorPicker', { Default = Color3.new(1,1,1), Title = 'Text Color', Callback = function(v) ESP.TextColor = v end })
+EspGroup:AddToggle('EspDistance', { Text = 'Show Distance', Default = true, Callback = function(v) ESP.ShowDistance = v end })
+EspGroup:AddToggle('EspHealth', { Text = 'Show Health Bar', Default = true, Callback = function(v) ESP.ShowHealth = v end })
 
-LeftGroupBox:AddToggle('EspBoxes', {
-    Text = 'Show Boxes',
-    Default = true,
-    Callback = function(Value)
-        ESP.ShowBoxes = Value
-    end
-}):AddColorPicker('BoxColorPicker', {
-    Default = Color3.fromRGB(255, 255, 255),
-    Title = 'Box Color',
-    Callback = function(Value)
-        ESP.BoxColor = Value
-    end
-})
-
-LeftGroupBox:AddToggle('EspNames', {
-    Text = 'Show Names',
-    Default = true,
-    Callback = function(Value)
-        ESP.ShowNames = Value
-    end
-}):AddColorPicker('TextColorPicker', {
-    Default = Color3.fromRGB(255, 255, 255),
-    Title = 'Text Color',
-    Callback = function(Value)
-        ESP.TextColor = Value
-    end
-})
-
-LeftGroupBox:AddToggle('EspDistance', {
-    Text = 'Show Distance',
-    Default = true,
-    Callback = function(Value)
-        ESP.ShowDistance = Value
-    end
-})
-
-LeftGroupBox:AddToggle('EspHealth', {
-    Text = 'Show Health Bar',
-    Default = true,
-    Callback = function(Value)
-        ESP.ShowHealth = Value
-    end
-})
-
-local TracerGroupBox = Tabs.Main:AddRightGroupbox('Tracer Settings')
-
-TracerGroupBox:AddToggle('EspTracers', {
-    Text = 'Show Tracers',
-    Default = false,
-    Callback = function(Value)
-        ESP.ShowTracers = Value
-    end
-}):AddColorPicker('TracerColorPicker', {
-    Default = Color3.fromRGB(255, 255, 255),
-    Title = 'Tracer Color',
-    Callback = function(Value)
-        ESP.TracerColor = Value
-    end
-})
-
-TracerGroupBox:AddDropdown('TracerOrigin', {
-    Values = { 'Top', 'Middle', 'Bottom', 'Mouse' },
-    Default = 3,
-    Multi = false,
-    Text = 'Tracer Position',
-    Callback = function(Value)
-        ESP.TracerOrigin = Value
-    end
-})
+local TracerGroup = Tabs.Main:AddRightGroupbox('Universal Tracers')
+TracerGroup:AddToggle('EspTracers', { Text = 'Show Tracers', Default = false, Callback = function(v) ESP.ShowTracers = v end }):AddColorPicker('TracerColorPicker', { Default = Color3.new(1,1,1), Title = 'Tracer Color', Callback = function(v) ESP.TracerColor = v end })
+TracerGroup:AddDropdown('TracerOrigin', { Values = { 'Top', 'Middle', 'Bottom', 'Mouse' }, Default = 3, Multi = false, Text = 'Tracer Position', Callback = function(v) ESP.TracerOrigin = v end })
 
 local function setupPlayer(plr)
-    plr.CharacterAdded:Connect(function(char)
+    local function add(char)
         task.delay(0.5, function()
             ESP:Add(char, {
                 Name = plr.Name,
-                Player = plr,
-                IsEnabled = function()
-                    return plr.Character == char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0
-                end
+                IsEnabled = function() return plr.Character == char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 end
             })
         end)
-    end)
-    
-    if plr.Character then
-        ESP:Add(plr.Character, {
-            Name = plr.Name,
-            Player = plr,
-            IsEnabled = function()
-                return plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0
-            end
-        })
     end
+    plr.CharacterAdded:Connect(add)
+    if plr.Character then add(plr.Character) end
 end
 
 for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
-    if plr ~= game:GetService("Players").LocalPlayer then
-        setupPlayer(plr)
+    if plr ~= game:GetService("Players").LocalPlayer then setupPlayer(plr) end
+end
+game:GetService("Players").PlayerAdded:Connect(setupPlayer)
+game:GetService("Players").PlayerRemoving:Connect(function(plr) if plr.Character then ESP:Remove(plr.Character) end end)
+
+local supportedGames = {
+    [18512143015] = "src/games/divedown.lua", -- Dive Down
+}
+
+local gamePath = supportedGames[game.PlaceId]
+if gamePath then
+    local gameScript = loadFile(gamePath)
+    if gameScript then
+        task.spawn(function()
+            gameScript(Window, Tabs, ESP)
+        end)
     end
 end
 
-game:GetService("Players").PlayerAdded:Connect(function(plr)
-    setupPlayer(plr)
-end)
-
-game:GetService("Players").PlayerRemoving:Connect(function(plr)
-    if plr.Character then
-        ESP:Remove(plr.Character)
-    end
-end)
-
 local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
-MenuGroup:AddButton('Unload', function() 
-    ESP:Unload()
-    Library:Unload() 
-end)
+local unloadConfirm = false
+MenuGroup:AddButton({
+    Text = 'Unload',
+    Func = function() 
+        if unloadConfirm then
+            ESP:Unload()
+            Library:Unload()
+        else
+            unloadConfirm = true
+            Library:Notify("Press again to confirm unload", 3)
+            task.delay(3, function() unloadConfirm = false end)
+        end
+    end
+})
 
 MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'End', NoUI = true, Text = 'Menu keybind' })
 Library.ToggleKeybind = Options.MenuKeybind
-
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
 SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
-
 ThemeManager:SetFolder('BHubRemastered')
 SaveManager:SetFolder('BHubRemastered/Games')
-
 SaveManager:BuildConfigSection(Tabs['UI Settings'])
 ThemeManager:ApplyToTab(Tabs['UI Settings'])
-
 SaveManager:LoadAutoloadConfig()
