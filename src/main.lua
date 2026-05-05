@@ -145,6 +145,10 @@ AppearanceGroup:AddToggle('WindowShadow', { Text = 'Window Shadow', Default = tr
     if Window and Window.SetShadowEnabled then Window:SetShadowEnabled(v) end
 end })
 
+AppearanceGroup:AddSlider('WindowShadowAlpha', { Text = 'Shadow Alpha', Min = 0, Max = 0.9, Default = 0.35, Rounding = 2, Callback = function(v)
+    if Window and Window.SetShadowTransparency then Window:SetShadowTransparency(v) end
+end })
+
 -- Simple menu toggle - check for Delete key (default keybind)
 UserInputService.InputBegan:Connect(function(inp, gp)
     if gp then return end

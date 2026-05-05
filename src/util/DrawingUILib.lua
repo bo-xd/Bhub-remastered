@@ -157,6 +157,7 @@ function Library:CreateWindow(opts)
 
     -- Chrome (title bar + tab strip)
     local wShd  = d("Square",{Filled=true, ZIndex=9, Rounding=10, Color=Color3.new(0,0,0), Transparency=0.35, Visible=true,Position=Win.Pos+Vector2.new(4,4),Size=Vector2.new(W,BAR)})
+    Win.ShadowTransparency = 0.35
     local wBg   = d("Square",{Filled=true, ZIndex=10,Rounding=10,Color=T().Bg,    Visible=true,Position=Win.Pos,Size=Vector2.new(W,BAR)})
     local wOut  = d("Square",{Filled=false,ZIndex=10,Rounding=10,Thickness=1,Color=T().GroupBorder,Visible=true,Position=Win.Pos,Size=Vector2.new(W,BAR)})
     local wBar  = d("Square",{Filled=true, ZIndex=11,Rounding=10,Color=T().Bar,   Visible=true,Position=Win.Pos,Size=Vector2.new(W,BAR)})
@@ -843,6 +844,19 @@ function Library:CreateWindow(opts)
         pcall(function() wShd.Visible = Win.ShadowEnabled end)
         layout()
     end
+
+    function Win:SetShadowTransparency(v)
+        local n = tonumber(v) or 0
+        n = math.clamp(n, 0, 1)
+        Win.ShadowTransparency = n
+        pcall(function() wShd.Transparency = n end)
+    end
+
+    -- Persist shadow settings through the library config API
+    pcall(function()
+        Library:_regCfg('WindowShadow', function() return Win.ShadowEnabled end, function(v) Win:SetShadowEnabled(v) end)
+        Library:_regCfg('WindowShadowAlpha', function() return Win.ShadowTransparency end, function(v) Win:SetShadowTransparency(v) end)
+    end)
 
     layout(); return Win
 end
