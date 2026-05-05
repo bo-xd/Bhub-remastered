@@ -1,19 +1,6 @@
-local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
-local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
-local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
-local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
-
 local plrs = game:GetService("Players")
 local plr = plrs.LocalPlayer
 local RunService = game:GetService("RunService")
-
-local Window = Library:CreateWindow({
-    Title = 'BHub Remastered',
-    Center = true,
-    AutoShow = true,
-    TabPadding = 8,
-    MenuFadeTime = 0.2
-})
 
 local GITHUB_TOKEN = "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"
 local REPO = "bo-xd/Bhub-remastered"
@@ -38,6 +25,10 @@ local function loadFile(path)
     end
     return nil
 end
+
+local Library = loadFile("src/util/DrawingUILib.lua")
+local Window = Library:CreateWindow({ Title = 'BHub Remastered' })
+
 
 local ESP = loadFile("src/util/Esp.lua")
 
@@ -134,12 +125,4 @@ MenuGroup:AddButton({ Text = 'Unload', Func = function()
     end
 end })
 MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'Delete', NoUI = true, Text = 'Menu keybind' })
-task.spawn(function() while not Options.MenuKeybind do task.wait() end Library.ToggleKeybind = Options.MenuKeybind end)
 
-ThemeManager:SetLibrary(Library)
-SaveManager:SetLibrary(Library)
-ThemeManager:SetFolder('BHubRemastered')
-SaveManager:SetFolder('BHubRemastered/Games')
-SaveManager:BuildConfigSection(Tabs['UI Settings'])
-ThemeManager:ApplyToTab(Tabs['UI Settings'])
-SaveManager:LoadAutoloadConfig()
