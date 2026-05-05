@@ -714,7 +714,7 @@ function Library:CreateWindow(opts)
                 if activeDD then activeDD.close(); activeDD=nil end
                 if activeBind then activeBind.cancel(); activeBind=nil end
                 
-                -- Hide old tab
+                -- Hide old tab completely
                 for _, ob in ipairs(Win.Btns) do
                     if ob.Tab then
                         for _,gb in ipairs(ob.Tab.L) do gb.setVis(false) end
@@ -723,13 +723,20 @@ function Library:CreateWindow(opts)
                     end
                 end
                 
-                -- Set active and layout BEFORE showing
-                Win.Active=Tab; layout()
+                -- Set active tab
+                Win.Active=Tab
                 
-                -- Show new tab
-            for _,gb in ipairs(Tab.L) do gb.setVis(true) end
-            for _,gb in ipairs(Tab.R) do gb.setVis(true) end
-            bLbl.Color=T().TabOn; bInd.Visible=true
+                -- Force layout to recalculate positions
+                layout()
+                
+                -- Explicitly re-position all items in new tab before making visible
+                for _,gb in ipairs(Tab.L) do gb.setPos(gb.pos) end
+                for _,gb in ipairs(Tab.R) do gb.setPos(gb.pos) end
+                
+                -- Now show new tab
+                for _,gb in ipairs(Tab.L) do gb.setVis(true) end
+                for _,gb in ipairs(Tab.R) do gb.setVis(true) end
+                bLbl.Color=T().TabOn; bInd.Visible=true
         end
 
         btn.bLbl=bLbl; btn.bInd=bInd
