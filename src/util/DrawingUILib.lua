@@ -254,7 +254,13 @@ function Library:CreateWindow(opts)
     -- Close dropdown when clicking outside it
     on(UserInputService.InputBegan, function(i)
         if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
-        if activeDD and not over(activeDD.pos, activeDD.sz) then activeDD.close(); activeDD = nil end
+        if activeDD then
+            local inList = activeDD.pos and activeDD.sz and over(activeDD.pos, activeDD.sz)
+            local inBtn = activeDD.btnPos and activeDD.btnSz and over(activeDD.btnPos, activeDD.btnSz)
+            if not inList and not inBtn then
+                activeDD.close(); activeDD = nil
+            end
+        end
     end)
 
     -- ── Groupbox factory ──────────────────────────────────────────────────────
@@ -567,7 +573,13 @@ function Library:CreateWindow(opts)
                         row.txt.Text=tostring(v); row.txt.Visible=true
                     end
                 end
-                activeDD = {close=closeDD, pos=fv(Vector2.new(lx,baseY)), sz=fv(Vector2.new(lw,listH))}
+                activeDD = {
+                    close=closeDD,
+                    pos=fv(Vector2.new(lx,baseY)),
+                    sz=fv(Vector2.new(lw,listH)),
+                    btnPos=dBg.Position,
+                    btnSz=dBg.Size,
+                }
             end
 
             local it = {h=52}
