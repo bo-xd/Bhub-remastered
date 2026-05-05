@@ -234,9 +234,21 @@ return function(Window, ESP, Library)
                 if okB and okM and bS and mS then
                     local bNext = getVal(bS)
                     local mNext = getVal(mS)
-                    local bT = math.max(0, math.floor(bNext - os.time()))
-                    local mT = math.max(0, math.floor(mNext - os.time()))
-                    TimerLabel:SetText(string.format("Bloop: %ds | Mermaid: %ds", bT, mT))
+                    local now = os.time()
+                    local function hhmmss(secs)
+                        secs = math.max(0, math.floor(secs))
+                        local h = math.floor(secs / 3600)
+                        local m = math.floor((secs % 3600) / 60)
+                        local s = secs % 60
+                        return string.format("%02d:%02d:%02d", h, m, s)
+                    end
+                    local bRem = (type(bNext) == "number") and math.max(0, math.floor(bNext - now)) or 0
+                    local mRem = (type(mNext) == "number") and math.max(0, math.floor(mNext - now)) or 0
+                    local bRemStr = hhmmss(bRem)
+                    local mRemStr = hhmmss(mRem)
+                    local bTimeStr = (type(bNext) == "number") and os.date("%Y-%m-%d %H:%M:%S", bNext) or "N/A"
+                    local mTimeStr = (type(mNext) == "number") and os.date("%Y-%m-%d %H:%M:%S", mNext) or "N/A"
+                    TimerLabel:SetText(string.format("Bloop: %s (in %s)\nMermaid: %s (in %s)", bTimeStr, bRemStr, mTimeStr, mRemStr))
                 else
                     TimerLabel:SetText("Searching for Schedule Modules...")
                 end
