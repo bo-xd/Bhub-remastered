@@ -63,16 +63,33 @@ Library.Themes = {
     },
 }
 
--- ── Helpers ───────────────────────────────────────────────────────────────────
+-- ── Helpers & Animation Engine ────────────────────────────────────────────────
+local baseTransMap = {}
+local notifyList = {}
+
 local function T()   return Library.Themes[Library.CurrentThemeName] end
 local function th(f) table.insert(Library.ThemeUpdaters, f) end
 
 local function d(class, props)
     local obj = Drawing.new(class)
+    baseTransMap[obj] = props.Transparency or 1
     for k,v in pairs(props) do pcall(function() obj[k]=v end) end
     table.insert(Library.Drawings, obj)
     return obj
 end
+
+local function removeDrawing(obj)
+    pcall(function() obj.Visible = false end)
+    pcall(function() obj:Remove() end)
+    for i = #Library.Drawings, 1, -1 do
+        if Library.Drawings[i] == obj then
+            table.remove(Library.Drawings, i)
+            break
+        end
+    end
+    baseTransMap[obj] = nil
+end
+
 local function on(sig, fn)
     local c = sig:Connect(fn); table.insert(Library.Connections, c); return c
 end
@@ -85,6 +102,102 @@ local function keyName(kc)
     if not kc then return "None" end
     local s = tostring(kc)
     return s:match("KeyCode%.(.+)") or s:match("UserInputType%.(.+)") or s
+end
+
+-- ── Notifications System (Sliding & Fading) ───────────────────────────────────
+on(RunService.RenderStepped, function(dt)
+    local vp = workspace.CurrentCamera.ViewportSize
+    local currentY = vp.Y - 20 -- Margin from bottom
+    
+    for i = #notifyList, 1, -1 do
+        local notif = notifyList[i]
+        currentY = currentY - notif.h - 10 -- Spacing
+        notif.targetY = currentY
+        
+        -- Smooth sliding interpolation
+        notif.currentY = notif.currentY + (notif.targetY - notif.currentY) * 12 * dt
+        
+        local x = vp.X - notif.w - 20
+        local y = notif.currentY
+        
+        pcall(function()
+            notif.objs.bg.Position = Vector2.new(x, y)
+            notif.objs.out.Position = Vector2.new(x, y)
+            notif.objs.acc.Position = Vector2.new(x, y)
+            notif.objs.txt.Position = Vector2.new(x + 12, y + (notif.h - notif.objs.txt.TextBounds.Y)/2)
+            
+            -- Keep colors synced with active theme
+            notif.objs.bg.Color = T().GroupBg
+            notif.objs.out.Color = T().GroupBorder
+            notif.objs.acc.Color = T().Accent
+            notif.objs.txt.Color = T().Text
+        end)
+        
+        -- Handle Expiration and Fade-out
+        if tick() - notif.createdAt >= notif.duration and not notif.fadingOut then
+            notif.fadingOut = true
+            task.spawn(function()
+                for j = 1, 10 do
+                    local a = 1 - (j/10)
+                    pcall(function()
+                        notif.objs.bg.Transparency = a; notif.objs.out.Transparency = a
+                        notif.objs.acc.Transparency = a; notif.objs.txt.Transparency = a
+                    end)
+                    task.wait(0.015)
+                end
+                removeDrawing(notif.objs.bg); removeDrawing(notif.objs.out)
+                removeDrawing(notif.objs.acc); removeDrawing(notif.objs.txt)
+            end)
+        end
+    end
+    
+    -- Clean table
+    for i = #notifyList, 1, -1 do
+        if notifyList[i].fadingOut and tick() - notifyList[i].createdAt > notifyList[i].duration + 0.5 then
+            table.remove(notifyList, i)
+        end
+    end
+end)
+
+function Library:Notify(text, duration)
+    duration = duration or 3
+    
+    -- Create text to get bounds
+    local txt = d("Text", {Text=text, Size=14, Font=FONT, Outline=false, Color=T().Text, Visible=true, ZIndex=102})
+    local bounds = txt.TextBounds
+    local w = bounds.X + 26
+    local h = 30
+    
+    -- Create base parts
+    local bg = d("Square", {Filled=true, ZIndex=100, Rounding=4, Color=T().GroupBg, Visible=true})
+    local out = d("Square", {Filled=false, ZIndex=100, Rounding=4, Thickness=1, Color=T().GroupBorder, Visible=true})
+    local acc = d("Square", {Filled=true, ZIndex=101, Rounding=0, Color=T().Accent, Visible=true})
+    
+    baseTransMap[bg] = 1; baseTransMap[out] = 1; baseTransMap[acc] = 1; baseTransMap[txt] = 1
+    bg.Transparency = 0; out.Transparency = 0; acc.Transparency = 0; txt.Transparency = 0
+    
+    local vp = workspace.CurrentCamera.ViewportSize
+    local startX = vp.X - w - 20
+    local startY = vp.Y + h -- Start offscreen
+    
+    bg.Size = Vector2.new(w, h); out.Size = Vector2.new(w, h); acc.Size = Vector2.new(2, h)
+    
+    local notif = {
+        targetY = startY, currentY = startY, createdAt = tick(),
+        duration = duration, fadingOut = false, w = w, h = h,
+        objs = {bg=bg, out=out, acc=acc, txt=txt}
+    }
+    
+    table.insert(notifyList, notif)
+    
+    -- Fade in
+    task.spawn(function()
+        for i = 1, 10 do
+            local a = i/10
+            pcall(function() bg.Transparency=a; out.Transparency=a; acc.Transparency=a; txt.Transparency=a end)
+            task.wait(0.015)
+        end
+    end)
 end
 
 -- ── Theme API ─────────────────────────────────────────────────────────────────
@@ -135,15 +248,15 @@ local activeBind = nil  -- { cancel=fn }
 function Library:CreateWindow(opts)
     local title   = opts.Title or "BHub"
     local BASE_W  = 520
-    local W       = BASE_W         -- window width
-    local BAR     = 32            -- title bar height
-    local TAB_RH  = 26            -- height per tab row
+    local W       = BASE_W         
+    local BAR     = 32            
+    local TAB_RH  = 26            
     local PAD     = 8
     local GAP     = 6
-    local COL     = math.floor((W - PAD*2 - GAP) / 2)  -- ~248
-    local IP      = 8             -- item inner padding
-    local MAXDD   = 14            -- max dropdown rows
-    local DD_H    = 22            -- dropdown row height
+    local COL     = math.floor((W - PAD*2 - GAP) / 2)
+    local IP      = 8             
+    local MAXDD   = 14            
+    local DD_H    = 22            
     local MIN_W   = BASE_W
     local MAX_W   = 900
     local MIN_H   = 300
@@ -155,7 +268,6 @@ function Library:CreateWindow(opts)
         ShadowEnabled = true,
     }
 
-    -- Chrome (title bar + tab strip)
     local wShd  = d("Square",{Filled=true, ZIndex=9, Rounding=10, Color=Color3.new(0,0,0), Transparency=0.35, Visible=true,Position=Win.Pos+Vector2.new(4,4),Size=Vector2.new(W,BAR)})
     Win.ShadowTransparency = 0.35
     local wBg   = d("Square",{Filled=true, ZIndex=10,Rounding=10,Color=T().Bg,    Visible=true,Position=Win.Pos,Size=Vector2.new(W,BAR)})
@@ -174,38 +286,68 @@ function Library:CreateWindow(opts)
         wOut.Color=T().GroupBorder; wTBg.Color=T().Bar; wTSep.Color=T().Sep; wTit.Color=T().Text; wGrip.Color=T().Dim; wGrip2.Color=T().Accent
     end)
 
-    -- All chrome objects for proper visibility restore
     local chromeObjs = {wShd, wBg, wOut, wBar, wBBt, wAcc, wTBg, wTSep, wTit, wGrip, wGrip2}
 
-    -- ── Visibility toggle (correct hide/restore) ───────────────────────────────
+    -- ── Animated Visibility toggle ───────────────────────────────
+    local isAnimating = false
     local function setVisible(v)
+        if isAnimating or Win.Visible == v then return end
+        isAnimating = true
         Win.Visible = v
+
         if not v then
-            -- Hide everything with no exceptions
+            -- Fade Out
+            local activeObjs = {}
+            for _, obj in ipairs(Library.Drawings) do
+                if obj.Visible then table.insert(activeObjs, obj) end
+            end
+            for i = 1, 10 do
+                local a = 1 - (i/10)
+                for _, obj in ipairs(activeObjs) do
+                    pcall(function() obj.Transparency = (baseTransMap[obj] or 1) * a end)
+                end
+                task.wait(0.015)
+            end
+            -- Hide and reset baseline
             for _, obj in ipairs(Library.Drawings) do
                 pcall(function() obj.Visible = false end)
+                pcall(function() obj.Transparency = (baseTransMap[obj] or 1) end)
             end
         else
-            -- Restore chrome
-            for _, obj in ipairs(chromeObjs) do pcall(function() obj.Visible = true end) end
-            -- Restore tab buttons
-            for _, btn in ipairs(Win.Btns) do
-                btn.bLbl.Visible = true
-                btn.bInd.Visible = (Win.Active == btn.Tab)
+            -- Set to 0 Transparency pre-show
+            for _, obj in ipairs(Library.Drawings) do
+                pcall(function() obj.Transparency = 0 end)
             end
-            -- Restore active tab groupbox items only
+            
+            -- Show targeted chrome and UI elements
+            for _, obj in ipairs(chromeObjs) do pcall(function() obj.Visible = true end) end
+            for _, btn in ipairs(Win.Btns) do
+                btn.bLbl.Visible = true; btn.bInd.Visible = (Win.Active == btn.Tab)
+            end
             if Win.Active then
                 for _, gb in ipairs(Win.Active.L) do gb.setVis(true) end
                 for _, gb in ipairs(Win.Active.R) do gb.setVis(true) end
             end
+            
+            -- Fade In
+            local activeObjs = {}
+            for _, obj in ipairs(Library.Drawings) do
+                if obj.Visible then table.insert(activeObjs, obj) end
+            end
+            for i = 1, 10 do
+                local a = (i/10)
+                for _, obj in ipairs(activeObjs) do
+                    pcall(function() obj.Transparency = (baseTransMap[obj] or 1) * a end)
+                end
+                task.wait(0.015)
+            end
         end
+        isAnimating = false
     end
 
-    -- ── Layout (handles dynamic multi-row tab strip) ───────────────────────────
+    -- ── Layout ───────────────────────────
     local function layout()
-        -- Recalculate column width based on current window width so children reflow on resize
         COL = math.floor((W - PAD*2 - GAP) / 2)
-        -- Calculate tab rows
         local tabRows, tx = 1, 10
         for _, btn in ipairs(Win.Btns) do
             if #Win.Btns > 1 and tx + btn.w > W - 10 then tx = 10; tabRows = tabRows + 1 end
@@ -215,7 +357,6 @@ function Library:CreateWindow(opts)
         local dynHDR  = BAR + 2 + dynTH + 1
         local dynCONTY = dynHDR + 1 + PAD
 
-        -- Chrome positions
         wShd.Position = fv(Win.Pos + Vector2.new(4, 4))
         wShd.Size     = fv(Vector2.new(W, dynTH + BAR + 3))
         wBg.Position  = fv(Win.Pos)
@@ -232,7 +373,6 @@ function Library:CreateWindow(opts)
         wTSep.Size    = fv(Vector2.new(W, 1))
         wTit.Position = fv(Win.Pos + Vector2.new(13, 8))
 
-        -- Tab button positions (wrap to next row when overflow)
         local bx, row = 10, 1
         for _, btn in ipairs(Win.Btns) do
             if bx + btn.w > W - 10 then bx = 10; row = row + 1 end
@@ -241,11 +381,9 @@ function Library:CreateWindow(opts)
             bx = bx + btn.w + 10
         end
 
-        -- Content
         if not Win.Active then
             local targetH = math.max(dynCONTY + 50, userMinH)
-            wBg.Size = fv(Vector2.new(W, targetH))
-            wOut.Size = wBg.Size
+            wBg.Size = fv(Vector2.new(W, targetH)); wOut.Size = wBg.Size
             wShd.Size = fv(wBg.Size + Vector2.new(0, 2))
             wGrip.Position = fv(wBg.Position + wBg.Size - Vector2.new(14,14))
             wGrip2.Position = fv(wBg.Position + wBg.Size - Vector2.new(10,10))
@@ -264,31 +402,23 @@ function Library:CreateWindow(opts)
         wBg.Size = fv(Vector2.new(W, math.max(contentH, userMinH)))
         wOut.Size = wBg.Size
         wShd.Size = fv(wBg.Size + Vector2.new(0, 2))
-        -- Shadow visibility controlled by window setting (user can toggle)
         pcall(function() wShd.Visible = Win.ShadowEnabled end)
         wGrip.Position = fv(wBg.Position + wBg.Size - Vector2.new(14,14))
         wGrip2.Position = fv(wBg.Position + wBg.Size - Vector2.new(10,10))
     end
 
-    -- Drag
     on(UserInputService.InputBegan, function(i)
         if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
         if over(wGrip.Position - Vector2.new(4,4), wGrip.Size + Vector2.new(8,8)) then
-            Win.Resizing = true
-            Win.ResizeStartMouse = UserInputService:GetMouseLocation()
-            Win.ResizeStartSize = wBg.Size
-            return
+            Win.Resizing = true; Win.ResizeStartMouse = UserInputService:GetMouseLocation()
+            Win.ResizeStartSize = wBg.Size; return
         end
         if over(Win.Pos, Vector2.new(W, BAR)) then
-            Win.Dragging = true
-            Win.DragOff = UserInputService:GetMouseLocation() - Win.Pos
+            Win.Dragging = true; Win.DragOff = UserInputService:GetMouseLocation() - Win.Pos
         end
     end)
     on(UserInputService.InputEnded, function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 then
-            Win.Dragging = false
-            Win.Resizing = false
-        end
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then Win.Dragging = false; Win.Resizing = false end
     end)
     on(RunService.RenderStepped, function()
         if Win.Resizing then
@@ -302,30 +432,25 @@ function Library:CreateWindow(opts)
         end
     end)
 
-    -- Close dropdown when clicking outside it
     on(UserInputService.InputBegan, function(i)
         if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
         local clickOnAnyDropHeader = false
         for _, ref in ipairs(Win.DropBtns) do
             if ref.pos and ref.sz and (not ref.active or ref.active()) and over(ref.pos, ref.sz) then
-                clickOnAnyDropHeader = true
-                break
+                clickOnAnyDropHeader = true; break
             end
         end
         if activeDD then
             if clickOnAnyDropHeader then return end
             local inList = activeDD.pos and activeDD.sz and over(activeDD.pos, activeDD.sz)
             local inBtn = activeDD.btnPos and activeDD.btnSz and over(activeDD.btnPos, activeDD.btnSz)
-            if not inList and not inBtn then
-                activeDD.close(); activeDD = nil
-            end
+            if not inList and not inBtn then activeDD.close(); activeDD = nil end
         end
     end)
 
-    -- ── Groupbox factory ──────────────────────────────────────────────────────
     local function makeGB(parentTab, side, name)
-        local GH = 26  -- header row height
-        local GP = 7   -- inner vertical padding
+        local GH = 26
+        local GP = 7
         local GB = {items={}, pos=Vector2.new()}
 
         local gBg  = d("Square",{Filled=true, ZIndex=14,Rounding=5,Color=T().GroupBg,     Visible=false,Size=Vector2.new(COL,GH)})
@@ -369,7 +494,6 @@ function Library:CreateWindow(opts)
 
         local Obj = {}
 
-        -- Toggle ---------------------------------------------------------------
         function Obj:AddToggle(id, o)
             local txt = o.Text or id
             local st  = o.Default or false
@@ -409,7 +533,6 @@ function Library:CreateWindow(opts)
             return Tog
         end
 
-        -- Button ---------------------------------------------------------------
         function Obj:AddButton(o)
             local txt = type(o)=="table" and o.Text or tostring(o)
             local fn  = type(o)=="table" and o.Func or function() end
@@ -436,7 +559,6 @@ function Library:CreateWindow(opts)
             addIt(it); return {}
         end
 
-        -- Slider ---------------------------------------------------------------
         function Obj:AddSlider(id, o)
             local txt     = o.Text or id
             local mn, mx  = o.Min or 0, o.Max or 100
@@ -487,7 +609,6 @@ function Library:CreateWindow(opts)
             return Sld
         end
 
-        -- Label ----------------------------------------------------------------
         function Obj:AddLabel(txt)
             local lbl = d("Text",{Text=txt,Size=14,Font=FONT,Outline=false,Color=T().Dim,Visible=false,ZIndex=20})
             th(function() lbl.Color=T().Dim end)
@@ -539,7 +660,6 @@ function Library:CreateWindow(opts)
             addIt(it); return Lbl
         end
 
-        -- Dropdown (real overlay list) -----------------------------------------
         function Obj:AddDropdown(id, o)
             local txt   = o.Text or id
             local vals  = o.Values or {}
@@ -550,12 +670,9 @@ function Library:CreateWindow(opts)
             local isOpen = false
             local isActive = false
             local ddBtnRef = {
-                pos=nil,
-                sz=nil,
-                active=function() return isActive and Win.Active == parentTab end,
+                pos=nil, sz=nil, active=function() return isActive and Win.Active == parentTab end,
             }
             table.insert(Win.DropBtns, ddBtnRef)
-            -- Default to first value for single-select
             if not multi and val==nil and vals[1] then val=vals[1] end
 
             local lbl  = d("Text",  {Text=txt,Size=14,Font=FONT,Outline=false,Color=T().Text,Visible=false,ZIndex=20})
@@ -576,7 +693,6 @@ function Library:CreateWindow(opts)
             end
             dVal.Text = display()
 
-            -- Overlay pool (MAXDD rows, created once, shown/hidden)
             local pool = {}
             for _=1,MAXDD do
                 local row = {
@@ -598,7 +714,6 @@ function Library:CreateWindow(opts)
                 for _,row in ipairs(pool) do
                     row.bg.Visible=false; row.chk.Visible=false; row.box.Visible=false; row.txt.Visible=false
                 end
-                -- clear active reference so other dropdowns can respond
                 pcall(function() Win._activeDropRef = nil end)
             end
 
@@ -608,7 +723,7 @@ function Library:CreateWindow(opts)
                 isOpen=true; pcall(function() dBg.Color=T().Accent end); dArr.Text="▴"
                 local count  = math.min(#vals, MAXDD)
                 local scrollIndex = 1
-                if count == 0 then return end  -- No items to show
+                if count == 0 then return end  
                 local listH  = count * DD_H + 6
                 local vp     = pcall(function() return workspace.CurrentCamera.ViewportSize end) and workspace.CurrentCamera.ViewportSize or Vector2.new(1920,1080)
                 local baseY  = dBg.Position.Y + dBg.Size.Y + 3
@@ -617,7 +732,6 @@ function Library:CreateWindow(opts)
                 lBg.Position =fv(Vector2.new(lx,baseY)); lBg.Size =fv(Vector2.new(lw,listH))
                 lOut.Position=fv(Vector2.new(lx,baseY)); lOut.Size=fv(Vector2.new(lw,listH))
                 lBg.Visible=true; lOut.Visible=true
-                -- show the first `count` rows; scrolling will offset this window over `vals`
                 for i=1, count do
                     local row = pool[i]
                     local v = vals[i]
@@ -642,17 +756,8 @@ function Library:CreateWindow(opts)
                         row.txt.Text=tostring(v); row.txt.Visible=true
                     end
                 end
-                -- scrolling state (1-based start index into vals)
                 local scrollState = {index = 1, visible = count}
-                activeDD = {
-                    close=closeDD,
-                    pos=fv(Vector2.new(lx,baseY)),
-                    sz=fv(Vector2.new(lw,listH)),
-                    btnPos=dBg.Position,
-                    btnSz=dBg.Size,
-                    scroll=scrollState,
-                }
-                -- mark this dropdown's button ref as the current active dropdown
+                activeDD = { close=closeDD, pos=fv(Vector2.new(lx,baseY)), sz=fv(Vector2.new(lw,listH)), btnPos=dBg.Position, btnSz=dBg.Size, scroll=scrollState }
                 pcall(function() Win._activeDropRef = ddBtnRef end)
             end
 
@@ -664,27 +769,22 @@ function Library:CreateWindow(opts)
             end
             function it.setPos(p)
                 iP=p; lbl.Position=fv(p+Vector2.new(IP,5))
-                -- compute current dropdown width based on current column width so it reflows on resize
                 local curDW = math.max(48, COL - IP*2)
                 dBg.Position=fv(p+Vector2.new(IP,24))
                 dBg.Size = fv(Vector2.new(curDW,24))
                 dVal.Position=fv(p+Vector2.new(IP+7,28))
                 dArr.Position=fv(p+Vector2.new(IP+curDW-14,28))
-                ddBtnRef.pos = dBg.Position
-                ddBtnRef.sz  = dBg.Size
+                ddBtnRef.pos = dBg.Position; ddBtnRef.sz  = dBg.Size
             end
 
             on(UserInputService.InputBegan, function(i)
                 if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
                 if Win.Active ~= parentTab or not isActive then return end
-                -- Toggle the header button
                 if dBg and dBg.Position and dBg.Size and over(dBg.Position, dBg.Size) then
-                    -- if another dropdown is currently open, ignore header clicks on this one
                     if activeDD and Win._activeDropRef and Win._activeDropRef ~= ddBtnRef then return end
                     if isOpen then closeDD(); activeDD=nil else openDD() end
                     return
                 end
-                -- Click a list item
                 if isOpen then
                     local scrollIdx = activeDD and activeDD.scroll and activeDD.scroll.index or 1
                     for idx, row in ipairs(pool) do
@@ -693,10 +793,9 @@ function Library:CreateWindow(opts)
                             local v = vals[actualIdx]
                             if multi then
                                 if type(val) ~= "table" then val={} end
-                                -- Toggle: set to true if not set, remove if true
                                 if val[v] then val[v]=nil else val[v]=true end
                                 dVal.Text = display()
-                                openDD()  -- refresh list in place (will re-evaluate visible window)
+                                openDD() 
                             else
                                 val=v; dVal.Text=display(); closeDD(); activeDD=nil
                             end
@@ -707,7 +806,6 @@ function Library:CreateWindow(opts)
                 end
             end)
 
-            -- Hover highlight on RenderStepped
             on(RunService.RenderStepped, function()
                 if not isOpen then return end
                 local scrollIdx = activeDD and activeDD.scroll and activeDD.scroll.index or 1
@@ -722,11 +820,9 @@ function Library:CreateWindow(opts)
                 end
             end)
 
-            -- Mouse wheel to scroll dropdown when open
             on(UserInputService.InputChanged, function(i)
                 if i.UserInputType ~= Enum.UserInputType.MouseWheel then return end
                 if not activeDD or not isOpen then return end
-                -- only scroll when mouse is over the list area or the dropdown button
                 local overList = activeDD.pos and activeDD.sz and over(activeDD.pos, activeDD.sz)
                 local overBtn = activeDD.btnPos and activeDD.btnSz and over(activeDD.btnPos, activeDD.btnSz)
                 if not overList and not overBtn then return end
@@ -739,7 +835,6 @@ function Library:CreateWindow(opts)
                 if delta == 0 then return end
                 local maxStart = math.max(1, #vals - s.visible + 1)
                 s.index = math.clamp(s.index + delta, 1, maxStart)
-                -- refresh visible rows according to new s.index
                 local lx, lw = dBg.Position.X, dBg.Size.X
                 local baseY = activeDD.pos.Y
                 for i=1, s.visible do
@@ -766,7 +861,6 @@ function Library:CreateWindow(opts)
                         row.bg.Visible = false; row.chk.Visible=false; row.box.Visible=false; row.txt.Visible=false
                     end
                 end
-                -- update activeDD scroll state
                 activeDD.scroll = s
             end)
 
@@ -775,16 +869,11 @@ function Library:CreateWindow(opts)
                 vals=v; if not multi then val=v[1] end; dVal.Text=display()
                 if isOpen then openDD() end
             end
-            Library:_regCfg(id,
-                function() return val end,
-                function(v) val=v; dVal.Text=display(); if o.Callback then o.Callback(val) end end
-            )
-            addIt(it)
-            if o.Callback then task.spawn(o.Callback, val) end
+            Library:_regCfg(id, function() return val end, function(v) val=v; dVal.Text=display(); if o.Callback then o.Callback(val) end end)
+            addIt(it); if o.Callback then task.spawn(o.Callback, val) end
             return Drop
         end
 
-        -- Keybind --------------------------------------------------------------
         function Obj:AddKeybind(id, o)
             local txt = o.Text or id
             local ok2, kc2 = pcall(function() return Enum.KeyCode[o.Default or "Unknown"] end)
@@ -820,14 +909,10 @@ function Library:CreateWindow(opts)
                 end
                 if not listening and i.KeyCode==kc then if o.OnKey then o.OnKey() end end
             end)
-            Library:_regCfg(id,
-                function() return tostring(kc) end,
-                function(v) local ok3,k3=pcall(function() return Enum.KeyCode[v] end); if ok3 and k3 then kc=k3; Bind.Value=kc; kbTxt.Text=keyName(kc) end end
-            )
+            Library:_regCfg(id, function() return tostring(kc) end, function(v) local ok3,k3=pcall(function() return Enum.KeyCode[v] end); if ok3 and k3 then kc=k3; Bind.Value=kc; kbTxt.Text=keyName(kc) end end)
             addIt(it); return Bind
         end
 
-        -- Input stub -----------------------------------------------------------
         function Obj:AddInput(id, o)
             local txt = o and o.Text or id; local cur = o and o.Default or ""
             local lbl = d("Text",{Text=txt..": ["..cur.."]",Size=14,Font=FONT,Outline=false,Color=T().Dim,Visible=false,ZIndex=20})
@@ -844,7 +929,6 @@ function Library:CreateWindow(opts)
         layout(); return Obj
     end
 
-    -- ── AddTab ────────────────────────────────────────────────────────────────
     function Win:AddTab(name)
         local Tab = {L={}, R={}, Name=name}
         table.insert(Win.Tabs, Tab)
@@ -860,11 +944,8 @@ function Library:CreateWindow(opts)
         end
 
         local function activate()
-                -- Close any active dropdown and binding listener
                 if activeDD then activeDD.close(); activeDD=nil end
                 if activeBind then activeBind.cancel(); activeBind=nil end
-                
-                -- Hide old tab completely
                 for _, ob in ipairs(Win.Btns) do
                     if ob.Tab then
                         for _,gb in ipairs(ob.Tab.L) do gb.setVis(false) end
@@ -872,18 +953,10 @@ function Library:CreateWindow(opts)
                         ob.bLbl.Color=T().TabOff; ob.bInd.Visible=false
                     end
                 end
-                
-                -- Set active tab
                 Win.Active=Tab
-                
-                -- Force layout to recalculate positions
                 layout()
-                
-                -- Explicitly re-position all items in new tab before making visible
                 for _,gb in ipairs(Tab.L) do gb.setPos(gb.pos) end
                 for _,gb in ipairs(Tab.R) do gb.setPos(gb.pos) end
-                
-                -- Now show new tab
                 for _,gb in ipairs(Tab.L) do gb.setVis(true) end
                 for _,gb in ipairs(Tab.R) do gb.setVis(true) end
                 bLbl.Color=T().TabOn; bInd.Visible=true
@@ -901,12 +974,8 @@ function Library:CreateWindow(opts)
         layout(); return Tab
     end
 
-    -- Expose visibility toggle on window
-    function Win:SetVisible(v)
-        setVisible(v)
-    end
+    function Win:SetVisible(v) setVisible(v) end
 
-    -- Allow toggling the backdrop shadow (user preference)
     function Win:SetShadowEnabled(v)
         Win.ShadowEnabled = not not v
         pcall(function() wShd.Visible = Win.ShadowEnabled end)
@@ -917,10 +986,10 @@ function Library:CreateWindow(opts)
         local n = tonumber(v) or 0
         n = math.clamp(n, 0, 1)
         Win.ShadowTransparency = n
+        baseTransMap[wShd] = n
         pcall(function() wShd.Transparency = n end)
     end
 
-    -- Persist shadow settings through the library config API
     pcall(function()
         Library:_regCfg('WindowShadow', function() return Win.ShadowEnabled end, function(v) Win:SetShadowEnabled(v) end)
         Library:_regCfg('WindowShadowAlpha', function() return Win.ShadowTransparency end, function(v) Win:SetShadowTransparency(v) end)
@@ -929,15 +998,11 @@ function Library:CreateWindow(opts)
     layout(); return Win
 end
 
--- ── Notify & Unload ───────────────────────────────────────────────────────────
-function Library:Notify(text, _duration)
-    print("[BHub]", text)
-end
-
 function Library:Unload()
     for _,c in ipairs(Library.Connections) do pcall(function() c:Disconnect() end) end
     for _,o in ipairs(Library.Drawings)   do pcall(function() o:Remove() end) end
     Library.Connections={}; Library.Drawings={}; Library.ThemeUpdaters={}; Library.ConfigData={}
+    notifyList={}
     activeDD=nil; activeBind=nil
 end
 

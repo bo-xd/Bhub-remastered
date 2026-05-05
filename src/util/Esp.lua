@@ -209,7 +209,6 @@ end
 
 function ESP:Init()
     if self._conn then self._conn:Disconnect() end
-    -- Optimized render loop[cite: 1]
     self._conn = RunService.RenderStepped:Connect(function() self:Update() end)
 end
 
