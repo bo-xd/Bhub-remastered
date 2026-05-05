@@ -7,7 +7,9 @@ Library.Connections = {}
 
 local function create(class, props)
     local obj = Drawing.new(class)
-    for i, v in pairs(props) do obj[i] = v end
+    for i, v in pairs(props) do 
+        pcall(function() obj[i] = v end) 
+    end
     table.insert(Library.Drawings, obj)
     return obj
 end
@@ -23,11 +25,15 @@ local function isMouseOver(pos, size)
     return mLoc.X >= pos.X and mLoc.X <= (pos.X + size.X) and mLoc.Y >= pos.Y and mLoc.Y <= (pos.Y + size.Y)
 end
 
+local function floorVec(v)
+    return Vector2.new(math.floor(v.X), math.floor(v.Y))
+end
+
 function Library:CreateWindow(options)
     local title = options.Title or "Custom Hub"
     local Window = {
         Position = Vector2.new(100, 100),
-        Size = Vector2.new(350, 30),
+        Size = Vector2.new(450, 30),
         Tabs = {},
         ActiveTab = nil,
         Dragging = false,
@@ -35,27 +41,31 @@ function Library:CreateWindow(options)
         Items = {}
     }
     
-    local MainFrame = create("Square", { Position = Window.Position, Size = Window.Size, Color = Color3.fromRGB(25, 25, 25), Filled = true, Visible = true, ZIndex = 1 })
-    local TopBar = create("Square", { Position = Window.Position, Size = Vector2.new(Window.Size.X, 30), Color = Color3.fromRGB(35, 35, 35), Filled = true, Visible = true, ZIndex = 2 })
+    local MainFrame = create("Square", { Position = Window.Position, Size = Window.Size, Color = Color3.fromRGB(25, 25, 25), Filled = true, Visible = true, ZIndex = 1, Rounding = 6 })
+    local TopBar = create("Square", { Position = Window.Position, Size = Vector2.new(Window.Size.X, 30), Color = Color3.fromRGB(35, 35, 35), Filled = true, Visible = true, ZIndex = 2, Rounding = 6 })
     local AccentLine = create("Square", { Position = Window.Position + Vector2.new(0, 30), Size = Vector2.new(Window.Size.X, 2), Color = Color3.fromRGB(0, 150, 255), Filled = true, Visible = true, ZIndex = 3 })
-    local Title = create("Text", { Position = Window.Position + Vector2.new(10, 6), Text = title, Size = 16, Color = Color3.fromRGB(255, 255, 255), Outline = true, Visible = true, ZIndex = 3, Font = 2 })
+    local Title = create("Text", { Position = Window.Position + Vector2.new(10, 6), Text = title, Size = 16, Color = Color3.fromRGB(255, 255, 255), Outline = true, Visible = true, ZIndex = 3, Font = 3 })
     
     local function UpdateLayout()
-        local y = 32
         local tabX = 10
+        local tabY = 32
         for _, tabBtn in ipairs(Window.Items) do
-            tabBtn:UpdatePosition(Window.Position + Vector2.new(tabX, y))
+            if tabX + tabBtn.Width > Window.Size.X - 10 then
+                tabX = 10
+                tabY = tabY + 25
+            end
+            tabBtn:UpdatePosition(floorVec(Window.Position + Vector2.new(tabX, tabY)))
             tabX = tabX + tabBtn.Width + 10
         end
-        if #Window.Items > 0 then y = y + 25 end
+        local contentY = #Window.Items > 0 and (tabY + 25) or 32
         
         if Window.ActiveTab then
             for _, item in ipairs(Window.ActiveTab.Items) do
-                item:UpdatePosition(Window.Position + Vector2.new(0, y))
-                y = y + item.Height
+                item:UpdatePosition(floorVec(Window.Position + Vector2.new(0, contentY)))
+                contentY = contentY + item.Height
             end
         end
-        MainFrame.Size = Vector2.new(Window.Size.X, math.max(y + 10, 80))
+        MainFrame.Size = floorVec(Vector2.new(Window.Size.X, math.max(contentY + 10, 80)))
     end
     
     connect(UserInputService.InputBegan, function(input)
@@ -71,7 +81,7 @@ function Library:CreateWindow(options)
     end)
     connect(RunService.RenderStepped, function()
         if Window.Dragging then
-            Window.Position = UserInputService:GetMouseLocation() - Window.DragOffset
+            Window.Position = floorVec(UserInputService:GetMouseLocation() - Window.DragOffset)
             TopBar.Position = Window.Position
             AccentLine.Position = Window.Position + Vector2.new(0, 30)
             MainFrame.Position = Window.Position
@@ -84,8 +94,8 @@ function Library:CreateWindow(options)
         local Tab = { Name = name, Items = {} }
         table.insert(self.Tabs, Tab)
         
-        local tabBtn = { Width = string.len(name) * 7 + 10 }
-        local Label = create("Text", { Text = name, Size = 14, Color = Color3.fromRGB(150, 150, 150), Outline = true, Visible = true, ZIndex = 3, Font = 2 })
+        local tabBtn = { Width = string.len(name) * 7.5 + 10 }
+        local Label = create("Text", { Text = name, Size = 14, Color = Color3.fromRGB(150, 150, 150), Outline = true, Visible = true, ZIndex = 3, Font = 3 })
         local currentPos = Vector2.new(0,0)
         
         function tabBtn:UpdatePosition(pos)
@@ -114,8 +124,8 @@ function Library:CreateWindow(options)
         function Tab:AddToggle(id, options)
             local Toggle = { Height = 25, State = options.Default or false }
             local text = options.Text or id
-            local Label = create("Text", { Text = text, Size = 13, Color = Color3.fromRGB(220, 220, 220), Outline = true, Visible = Window.ActiveTab == Tab, ZIndex = 3, Font = 2 })
-            local Box = create("Square", { Size = Vector2.new(14, 14), Color = Toggle.State and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(50, 50, 50), Filled = true, Visible = Window.ActiveTab == Tab, ZIndex = 3 })
+            local Label = create("Text", { Text = text, Size = 13, Color = Color3.fromRGB(220, 220, 220), Outline = true, Visible = Window.ActiveTab == Tab, ZIndex = 3, Font = 3 })
+            local Box = create("Square", { Size = Vector2.new(14, 14), Color = Toggle.State and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(50, 50, 50), Filled = true, Visible = Window.ActiveTab == Tab, ZIndex = 3, Rounding = 3 })
             local currentPos = Vector2.new(0,0)
             
             function Toggle:SetVisible(v) Label.Visible = v; Box.Visible = v end
@@ -147,8 +157,8 @@ function Library:CreateWindow(options)
             local callback = type(options) == "table" and options.Func or function() end
             local Button = { Height = 30 }
             
-            local BtnBg = create("Square", { Size = Vector2.new(Window.Size.X - 30, 22), Color = Color3.fromRGB(50, 50, 50), Filled = true, Visible = Window.ActiveTab == Tab, ZIndex = 3 })
-            local Label = create("Text", { Text = text, Size = 13, Color = Color3.fromRGB(255, 255, 255), Outline = true, Center = true, Visible = Window.ActiveTab == Tab, ZIndex = 4, Font = 2 })
+            local BtnBg = create("Square", { Size = Vector2.new(Window.Size.X - 30, 22), Color = Color3.fromRGB(50, 50, 50), Filled = true, Visible = Window.ActiveTab == Tab, ZIndex = 3, Rounding = 4 })
+            local Label = create("Text", { Text = text, Size = 13, Color = Color3.fromRGB(255, 255, 255), Outline = true, Center = true, Visible = Window.ActiveTab == Tab, ZIndex = 4, Font = 3 })
             
             function Button:SetVisible(v) BtnBg.Visible = v; Label.Visible = v end
             function Button:UpdatePosition(pos)
@@ -176,9 +186,9 @@ function Library:CreateWindow(options)
             local max = options.Max or 100
             local Slider = { Height = 40, Value = options.Default or min }
             
-            local Label = create("Text", { Text = text .. ": " .. tostring(Slider.Value), Size = 13, Color = Color3.fromRGB(220, 220, 220), Outline = true, Visible = Window.ActiveTab == Tab, ZIndex = 3, Font = 2 })
-            local SliderBg = create("Square", { Size = Vector2.new(Window.Size.X - 30, 8), Color = Color3.fromRGB(40, 40, 40), Filled = true, Visible = Window.ActiveTab == Tab, ZIndex = 3 })
-            local SliderFill = create("Square", { Size = Vector2.new(((Slider.Value - min) / (max - min)) * (Window.Size.X - 30), 8), Color = Color3.fromRGB(0, 150, 255), Filled = true, Visible = Window.ActiveTab == Tab, ZIndex = 4 })
+            local Label = create("Text", { Text = text .. ": " .. tostring(Slider.Value), Size = 13, Color = Color3.fromRGB(220, 220, 220), Outline = true, Visible = Window.ActiveTab == Tab, ZIndex = 3, Font = 3 })
+            local SliderBg = create("Square", { Size = Vector2.new(Window.Size.X - 30, 8), Color = Color3.fromRGB(40, 40, 40), Filled = true, Visible = Window.ActiveTab == Tab, ZIndex = 3, Rounding = 4 })
+            local SliderFill = create("Square", { Size = Vector2.new(((Slider.Value - min) / (max - min)) * (Window.Size.X - 30), 8), Color = Color3.fromRGB(0, 150, 255), Filled = true, Visible = Window.ActiveTab == Tab, ZIndex = 4, Rounding = 4 })
             
             function Slider:SetVisible(v) Label.Visible = v; SliderBg.Visible = v; SliderFill.Visible = v end
             function Slider:UpdatePosition(pos)
@@ -214,7 +224,7 @@ function Library:CreateWindow(options)
         
         function Tab:AddLabel(text)
             local LabelItem = { Height = 25 }
-            local Label = create("Text", { Text = text, Size = 13, Color = Color3.fromRGB(200, 200, 200), Outline = true, Visible = Window.ActiveTab == Tab, ZIndex = 3, Font = 2 })
+            local Label = create("Text", { Text = text, Size = 13, Color = Color3.fromRGB(200, 200, 200), Outline = true, Visible = Window.ActiveTab == Tab, ZIndex = 3, Font = 3 })
             
             function LabelItem:SetVisible(v) Label.Visible = v end
             function LabelItem:UpdatePosition(pos) Label.Position = pos + Vector2.new(15, 4) end
@@ -229,8 +239,8 @@ function Library:CreateWindow(options)
             local Dropdown = { Height = 45, Values = options.Values or {}, Value = options.Default, Multi = options.Multi }
             local text = options.Text or id
             
-            local Label = create("Text", { Text = text, Size = 13, Color = Color3.fromRGB(220, 220, 220), Outline = true, Visible = Window.ActiveTab == Tab, ZIndex = 3, Font = 2 })
-            local BtnBg = create("Square", { Size = Vector2.new(Window.Size.X - 30, 22), Color = Color3.fromRGB(50, 50, 50), Filled = true, Visible = Window.ActiveTab == Tab, ZIndex = 3 })
+            local Label = create("Text", { Text = text, Size = 13, Color = Color3.fromRGB(220, 220, 220), Outline = true, Visible = Window.ActiveTab == Tab, ZIndex = 3, Font = 3 })
+            local BtnBg = create("Square", { Size = Vector2.new(Window.Size.X - 30, 22), Color = Color3.fromRGB(50, 50, 50), Filled = true, Visible = Window.ActiveTab == Tab, ZIndex = 3, Rounding = 4 })
             
             local function getDisplay()
                 if Dropdown.Multi then
@@ -242,7 +252,7 @@ function Library:CreateWindow(options)
                 end
             end
             
-            local ValLabel = create("Text", { Text = getDisplay(), Size = 12, Color = Color3.fromRGB(255, 255, 255), Outline = true, Center = true, Visible = Window.ActiveTab == Tab, ZIndex = 4, Font = 2 })
+            local ValLabel = create("Text", { Text = getDisplay(), Size = 12, Color = Color3.fromRGB(255, 255, 255), Outline = true, Center = true, Visible = Window.ActiveTab == Tab, ZIndex = 4, Font = 3 })
             
             function Dropdown:SetVisible(v) Label.Visible = v; BtnBg.Visible = v; ValLabel.Visible = v end
             function Dropdown:UpdatePosition(pos)
@@ -266,7 +276,6 @@ function Library:CreateWindow(options)
                             Dropdown.Value = Dropdown.Values[idx]
                         else
                             local keys = Dropdown.Values
-                            -- Find first enabled key to toggle to the next
                             local currentKey = nil
                             for k,v in pairs(Dropdown.Value or {}) do if v then currentKey = k; break end end
                             local idx = table.find(keys, currentKey) or 0
