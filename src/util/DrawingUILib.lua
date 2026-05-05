@@ -509,10 +509,10 @@ function Library:CreateWindow(opts)
             local pool = {}
             for _=1,MAXDD do
                 local row = {
-                    bg  = d("Square",{Filled=true, ZIndex=92,Rounding=0,Color=T().DropItem,Visible=false}),
+                    bg  = d("Square",{Filled=true, ZIndex=92,Rounding=0,Color=T().DropItem,Visible=false,Position=Vector2.new(0,0),Size=Vector2.new(1,DD_H)}),
                     chk = d("Square",{Filled=true, ZIndex=94,Rounding=2,Color=T().Accent,  Visible=false,Size=Vector2.new(10,10)}),
                     box = d("Square",{Filled=false,ZIndex=94,Rounding=2,Thickness=1,Color=T().Dim,Visible=false,Size=Vector2.new(10,10)}),
-                    txt = d("Text",  {Size=13,Font=FONT,Outline=false,Color=T().Text,Visible=false,ZIndex=93}),
+                    txt = d("Text",  {Size=13,Font=FONT,Outline=false,Color=T().Text,Visible=false,ZIndex=93,Position=Vector2.new(0,0)}),
                 }
                 th(function() row.bg.Color=T().DropItem; row.chk.Color=T().Accent; row.box.Color=T().Dim; row.txt.Color=T().Text end)
                 table.insert(pool, row)
@@ -753,6 +753,11 @@ function Library:CreateWindow(opts)
         function Tab:AddLeftGroupbox(n)  return makeGB(Tab,"left", n) end
         function Tab:AddRightGroupbox(n) return makeGB(Tab,"right",n) end
         layout(); return Tab
+    end
+
+    -- Expose visibility toggle on window
+    function Win:SetVisible(v)
+        setVisible(v)
     end
 
     layout(); return Win
