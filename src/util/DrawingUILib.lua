@@ -309,6 +309,7 @@ function Library:CreateWindow(opts)
             local txt = o.Text or id
             local st  = o.Default or false
             local iP  = Vector2.new()
+            local isActive = false
             local lbl = d("Text",  {Text=txt,Size=14,Font=FONT,Outline=false,Color=T().Text,Visible=false,ZIndex=20})
             local trk = d("Square",{Size=Vector2.new(32,17),Filled=true,ZIndex=20,Rounding=8,Color=st and T().TogOn or T().TogOff,Visible=false})
             local thb = d("Square",{Size=Vector2.new(13,13),Filled=true,ZIndex=21,Rounding=6,Color=T().Thumb,Visible=false})
@@ -318,7 +319,7 @@ function Library:CreateWindow(opts)
                 thb.Position = fv(iP + Vector2.new(COL-44+(st and 16 or 2), 6))
             end
             local it = {h=28}
-            function it.setVis(v) lbl.Visible=v; trk.Visible=v; thb.Visible=v end
+            function it.setVis(v) lbl.Visible=v; trk.Visible=v; thb.Visible=v; isActive=v end
             function it.setPos(p)
                 iP=p; lbl.Position=fv(p+Vector2.new(IP,7))
                 trk.Position=fv(p+Vector2.new(COL-44,5))
@@ -327,7 +328,7 @@ function Library:CreateWindow(opts)
             local Tog = {State=st}
             on(UserInputService.InputBegan, function(i)
                 if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
-                if Win.Active ~= parentTab then return end
+                if Win.Active ~= parentTab or not isActive then return end
                 if over(iP, Vector2.new(COL, 28)) then
                     st = not st; Tog.State = st; refresh()
                     if o.Callback then o.Callback(st) end
@@ -377,6 +378,7 @@ function Library:CreateWindow(opts)
             local sW      = COL - IP*2
             local iP      = Vector2.new()
             local drag    = false
+            local isActive = false
             local lbl  = d("Text",  {Text=txt..": "..tostring(val),Size=14,Font=FONT,Outline=false,Color=T().Text,Visible=false,ZIndex=20})
             local sBg  = d("Square",{Size=Vector2.new(sW,6),Filled=true,ZIndex=20,Rounding=3,Color=T().SlidBg,Visible=false})
             local sFll = d("Square",{Size=Vector2.new(((val-mn)/(mx-mn))*sW,6),Filled=true,ZIndex=21,Rounding=3,Color=T().Accent,Visible=false})
@@ -394,7 +396,7 @@ function Library:CreateWindow(opts)
             end
             local Sld = {Value=val}
             local it = {h=48}
-            function it.setVis(v) lbl.Visible=v; sBg.Visible=v; sFll.Visible=v; sThb.Visible=v end
+            function it.setVis(v) lbl.Visible=v; sBg.Visible=v; sFll.Visible=v; sThb.Visible=v; isActive=v end
             function it.setPos(p)
                 iP=p; lbl.Position=fv(p+Vector2.new(IP,5))
                 sBg.Position=fv(p+Vector2.new(IP,28))
@@ -404,14 +406,14 @@ function Library:CreateWindow(opts)
             end
             on(UserInputService.InputBegan, function(i)
                 if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
-                if Win.Active ~= parentTab then return end
+                if Win.Active ~= parentTab or not isActive then return end
                 if over(sBg.Position, Vector2.new(sW, 16)) then
                     drag=true; apply((UserInputService:GetMouseLocation().X-sBg.Position.X)/sW)
                 end
             end)
             on(UserInputService.InputEnded, function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end end)
             on(RunService.RenderStepped, function()
-                if drag and Win.Active==parentTab then apply((UserInputService:GetMouseLocation().X-sBg.Position.X)/sW); Sld.Value=val end
+                if drag and Win.Active==parentTab and isActive then apply((UserInputService:GetMouseLocation().X-sBg.Position.X)/sW); Sld.Value=val end
             end)
             Library:_regCfg(id, function() return val end, function(v) val=v; Sld.Value=v; apply((v-mn)/(mx-mn)) end)
             addIt(it)
@@ -478,6 +480,7 @@ function Library:CreateWindow(opts)
             local dW    = COL - IP*2
             local iP    = Vector2.new()
             local isOpen = false
+            local isActive = false
             -- Default to first value for single-select
             if not multi and val==nil and vals[1] then val=vals[1] end
 
@@ -566,7 +569,8 @@ function Library:CreateWindow(opts)
             local it = {h=52}
             function it.setVis(v)
                 lbl.Visible=v; dBg.Visible=v; dVal.Visible=v; dArr.Visible=v
-                if not v and isOpen then closeDD() end
+                isActive=v
+                if not v and isOpen then closeDD(); if activeDD == dBg then activeDD=nil end end
             end
             function it.setPos(p)
                 iP=p; lbl.Position=fv(p+Vector2.new(IP,5))
@@ -577,7 +581,7 @@ function Library:CreateWindow(opts)
 
             on(UserInputService.InputBegan, function(i)
                 if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
-                if Win.Active ~= parentTab then return end
+                if Win.Active ~= parentTab or not isActive then return end
                 -- Toggle the header button
                 if over(dBg.Position, dBg.Size) then
                     if isOpen then closeDD(); activeDD=nil else openDD() end
@@ -636,12 +640,13 @@ function Library:CreateWindow(opts)
             local ok2, kc2 = pcall(function() return Enum.KeyCode[o.Default or "Unknown"] end)
             local kc = (ok2 and kc2) or Enum.KeyCode.Unknown
             local listening = false; local kbW = 64
+            local isActive = false
             local lbl   = d("Text",  {Text=txt,Size=14,Font=FONT,Outline=false,Color=T().Text,Visible=false,ZIndex=20})
             local kbBg  = d("Square",{Size=Vector2.new(kbW,20),Filled=true,ZIndex=20,Rounding=3,Color=T().Btn,Visible=false})
             local kbTxt = d("Text",  {Text=keyName(kc),Size=12,Font=FONT,Outline=false,Center=true,Color=T().Text,Visible=false,ZIndex=21})
             th(function() lbl.Color=T().Text; kbBg.Color=listening and T().Accent or T().Btn; kbTxt.Color=T().Text end)
             local it = {h=28}
-            function it.setVis(v) lbl.Visible=v; kbBg.Visible=v; kbTxt.Visible=v end
+            function it.setVis(v) lbl.Visible=v; kbBg.Visible=v; kbTxt.Visible=v; isActive=v end
             function it.setPos(p)
                 lbl.Position  = fv(p+Vector2.new(IP,7))
                 kbBg.Position = fv(p+Vector2.new(COL-kbW-IP,4))
@@ -649,7 +654,7 @@ function Library:CreateWindow(opts)
             end
             local Bind = {Value=kc}
             on(UserInputService.InputBegan, function(i)
-                if i.UserInputType==Enum.UserInputType.MouseButton1 and over(kbBg.Position, kbBg.Size) then
+                if i.UserInputType==Enum.UserInputType.MouseButton1 and over(kbBg.Position, kbBg.Size) and Win.Active==parentTab and isActive then
                     if activeBind then activeBind.cancel() end
                     listening=true; kbBg.Color=T().Accent; kbTxt.Text="..."
                     activeBind={cancel=function() listening=false; kbBg.Color=T().Btn; kbTxt.Text=keyName(kc); activeBind=nil end}
@@ -705,15 +710,20 @@ function Library:CreateWindow(opts)
         end
 
         local function activate()
-            for _, ob in ipairs(Win.Btns) do
-                if ob.Tab then
-                    for _,gb in ipairs(ob.Tab.L) do gb.setVis(false) end
-                    for _,gb in ipairs(ob.Tab.R) do gb.setVis(false) end
-                    ob.bLbl.Color=T().TabOff; ob.bInd.Visible=false
+                -- Close any active dropdown and binding listener
+                if activeDD then activeDD.close(); activeDD=nil end
+                if activeBind then activeBind.cancel(); activeBind=nil end
+                
+                -- Hide old tab
+                for _, ob in ipairs(Win.Btns) do
+                    if ob.Tab then
+                        for _,gb in ipairs(ob.Tab.L) do gb.setVis(false) end
+                        for _,gb in ipairs(ob.Tab.R) do gb.setVis(false) end
+                        ob.bLbl.Color=T().TabOff; ob.bInd.Visible=false
+                    end
                 end
-            end
-            if activeDD then activeDD.close(); activeDD=nil end
-            Win.Active=Tab
+                
+                -- Show new tab
             for _,gb in ipairs(Tab.L) do gb.setVis(true) end
             for _,gb in ipairs(Tab.R) do gb.setVis(true) end
             bLbl.Color=T().TabOn; bInd.Visible=true; layout()
