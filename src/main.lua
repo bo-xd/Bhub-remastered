@@ -114,6 +114,7 @@ plrs.PlayerRemoving:Connect(function(p) if p.Character then ESP:Remove(p.Charact
 
 -- UI Settings
 local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+local AppearanceGroup = Tabs['UI Settings']:AddRightGroupbox('Appearance')
 local uc = false
 MenuGroup:AddButton({ Text = 'Unload', Func = function()
     if uc then
@@ -126,6 +127,18 @@ MenuGroup:AddButton({ Text = 'Unload', Func = function()
     end
 end })
 MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'Delete', NoUI = true, Text = 'Menu keybind' })
+
+AppearanceGroup:AddDropdown('ThemeSelect', {
+    Text = 'Theme',
+    Values = {'Default', 'Dark', 'Midnight', 'Forest'},
+    Default = Library.CurrentThemeName,
+    Multi = false,
+    Callback = function(v)
+        if v and Library.Themes[v] then
+            Library:SetTheme(v)
+        end
+    end
+})
 
 -- Simple menu toggle - check for Delete key (default keybind)
 UserInputService.InputBegan:Connect(function(inp, gp)

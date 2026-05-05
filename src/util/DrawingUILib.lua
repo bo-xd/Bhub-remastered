@@ -134,7 +134,8 @@ local activeBind = nil  -- { cancel=fn }
 -- ── CreateWindow ──────────────────────────────────────────────────────────────
 function Library:CreateWindow(opts)
     local title   = opts.Title or "BHub"
-    local W       = 520           -- window width
+    local BASE_W  = 520
+    local W       = BASE_W         -- window width
     local BAR     = 32            -- title bar height
     local TAB_RH  = 26            -- height per tab row
     local PAD     = 8
@@ -143,28 +144,36 @@ function Library:CreateWindow(opts)
     local IP      = 8             -- item inner padding
     local MAXDD   = 14            -- max dropdown rows
     local DD_H    = 22            -- dropdown row height
+    local MIN_W   = BASE_W
+    local MAX_W   = 900
+    local MIN_H   = 300
+    local userMinH = 0
 
     local Win = {
         Pos=Vector2.new(100,100), Tabs={}, Active=nil,
-        Dragging=false, DragOff=Vector2.new(), Btns={}, Visible=true,
+        Dragging=false, Resizing=false, DragOff=Vector2.new(), ResizeStartMouse=Vector2.new(), ResizeStartSize=Vector2.new(), Btns={}, DropBtns={}, Visible=true,
     }
 
     -- Chrome (title bar + tab strip)
-    local wBg   = d("Square",{Filled=true, ZIndex=10,Rounding=6,Color=T().Bg,    Visible=true,Position=Win.Pos,Size=Vector2.new(W,BAR)})
-    local wBar  = d("Square",{Filled=true, ZIndex=11,Rounding=6,Color=T().Bar,   Visible=true,Position=Win.Pos,Size=Vector2.new(W,BAR)})
+    local wShd  = d("Square",{Filled=true, ZIndex=9, Rounding=10, Color=Color3.new(0,0,0), Transparency=0.65, Visible=true,Position=Win.Pos+Vector2.new(4,4),Size=Vector2.new(W,BAR)})
+    local wBg   = d("Square",{Filled=true, ZIndex=10,Rounding=10,Color=T().Bg,    Visible=true,Position=Win.Pos,Size=Vector2.new(W,BAR)})
+    local wOut  = d("Square",{Filled=false,ZIndex=10,Rounding=10,Thickness=1,Color=T().GroupBorder,Visible=true,Position=Win.Pos,Size=Vector2.new(W,BAR)})
+    local wBar  = d("Square",{Filled=true, ZIndex=11,Rounding=10,Color=T().Bar,   Visible=true,Position=Win.Pos,Size=Vector2.new(W,BAR)})
     local wBBt  = d("Square",{Filled=true, ZIndex=11,Rounding=0,Color=T().Bar,   Visible=true,Position=Win.Pos+Vector2.new(0,BAR-4),Size=Vector2.new(W,4)})
     local wAcc  = d("Square",{Filled=true, ZIndex=12,            Color=T().Accent,Visible=true,Position=Win.Pos+Vector2.new(0,BAR),Size=Vector2.new(W,2)})
     local wTBg  = d("Square",{Filled=true, ZIndex=11,Rounding=0,Color=T().Bar,   Visible=true,Position=Win.Pos+Vector2.new(0,BAR+2),Size=Vector2.new(W,TAB_RH)})
     local wTSep = d("Square",{Filled=true, ZIndex=12,            Color=T().Sep,   Visible=true,Position=Win.Pos+Vector2.new(0,BAR+2+TAB_RH),Size=Vector2.new(W,1)})
     local wTit  = d("Text",  {Text=title,Size=16,Font=FONT,Outline=false,Color=T().Text,Visible=true,ZIndex=13,Position=Win.Pos+Vector2.new(13,8)})
+    local wGrip = d("Square",{Filled=true, ZIndex=19,Rounding=3,Color=T().Dim,   Visible=true,Position=Win.Pos+Vector2.new(W-14,BAR-14),Size=Vector2.new(10,10)})
+    local wGrip2= d("Square",{Filled=true, ZIndex=20,Rounding=2,Color=T().Accent,Visible=true,Position=Win.Pos+Vector2.new(W-10,BAR-10),Size=Vector2.new(6,6)})
 
     th(function()
         wBg.Color=T().Bg; wBar.Color=T().Bar; wBBt.Color=T().Bar; wAcc.Color=T().Accent
-        wTBg.Color=T().Bar; wTSep.Color=T().Sep; wTit.Color=T().Text
+        wOut.Color=T().GroupBorder; wTBg.Color=T().Bar; wTSep.Color=T().Sep; wTit.Color=T().Text; wGrip.Color=T().Dim; wGrip2.Color=T().Accent
     end)
 
     -- All chrome objects for proper visibility restore
-    local chromeObjs = {wBg, wBar, wBBt, wAcc, wTBg, wTSep, wTit}
+    local chromeObjs = {wShd, wBg, wOut, wBar, wBBt, wAcc, wTBg, wTSep, wTit, wGrip, wGrip2}
 
     -- ── Visibility toggle (correct hide/restore) ───────────────────────────────
     local function setVisible(v)
@@ -203,8 +212,11 @@ function Library:CreateWindow(opts)
         local dynCONTY = dynHDR + 1 + PAD
 
         -- Chrome positions
+        wShd.Position = fv(Win.Pos + Vector2.new(4, 4))
+        wShd.Size     = fv(Vector2.new(W, dynTH + BAR + 3))
         wBg.Position  = fv(Win.Pos)
         wBar.Position = fv(Win.Pos)
+        wOut.Position = fv(Win.Pos)
         wBBt.Position = fv(Win.Pos + Vector2.new(0, BAR-4))
         wAcc.Position = fv(Win.Pos + Vector2.new(0, BAR))
         wTBg.Position = fv(Win.Pos + Vector2.new(0, BAR+2))
@@ -223,7 +235,12 @@ function Library:CreateWindow(opts)
 
         -- Content
         if not Win.Active then
-            wBg.Size = fv(Vector2.new(W, dynCONTY + 50))
+            local targetH = math.max(dynCONTY + 50, userMinH)
+            wBg.Size = fv(Vector2.new(W, targetH))
+            wOut.Size = wBg.Size
+            wShd.Size = fv(wBg.Size + Vector2.new(0, 2))
+            wGrip.Position = fv(wBg.Position + wBg.Size - Vector2.new(14,14))
+            wGrip2.Position = fv(wBg.Position + wBg.Size - Vector2.new(10,10))
             return
         end
         local lH, rH = 0, 0
@@ -235,26 +252,58 @@ function Library:CreateWindow(opts)
             gb.setPos(fv(Win.Pos + Vector2.new(PAD+COL+GAP, dynCONTY + rH)))
             rH = rH + gb.height() + PAD
         end
-        wBg.Size = fv(Vector2.new(W, dynCONTY + math.max(lH, rH, 40) + PAD))
+        local contentH = dynCONTY + math.max(lH, rH, 40) + PAD
+        wBg.Size = fv(Vector2.new(W, math.max(contentH, userMinH)))
+        wOut.Size = wBg.Size
+        wShd.Size = fv(wBg.Size + Vector2.new(0, 2))
+        wGrip.Position = fv(wBg.Position + wBg.Size - Vector2.new(14,14))
+        wGrip2.Position = fv(wBg.Position + wBg.Size - Vector2.new(10,10))
     end
 
     -- Drag
     on(UserInputService.InputBegan, function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 and over(Win.Pos, Vector2.new(W, BAR)) then
-            Win.Dragging = true; Win.DragOff = UserInputService:GetMouseLocation() - Win.Pos
+        if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+        if over(wGrip.Position - Vector2.new(4,4), wGrip.Size + Vector2.new(8,8)) then
+            Win.Resizing = true
+            Win.ResizeStartMouse = UserInputService:GetMouseLocation()
+            Win.ResizeStartSize = wBg.Size
+            return
+        end
+        if over(Win.Pos, Vector2.new(W, BAR)) then
+            Win.Dragging = true
+            Win.DragOff = UserInputService:GetMouseLocation() - Win.Pos
         end
     end)
     on(UserInputService.InputEnded, function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 then Win.Dragging = false end
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            Win.Dragging = false
+            Win.Resizing = false
+        end
     end)
     on(RunService.RenderStepped, function()
-        if Win.Dragging then Win.Pos = fv(UserInputService:GetMouseLocation() - Win.DragOff); layout() end
+        if Win.Resizing then
+            local delta = UserInputService:GetMouseLocation() - Win.ResizeStartMouse
+            W = math.clamp(math.floor(Win.ResizeStartSize.X + delta.X), MIN_W, MAX_W)
+            userMinH = math.max(MIN_H, math.floor(Win.ResizeStartSize.Y + delta.Y))
+            layout()
+        elseif Win.Dragging then
+            Win.Pos = fv(UserInputService:GetMouseLocation() - Win.DragOff)
+            layout()
+        end
     end)
 
     -- Close dropdown when clicking outside it
     on(UserInputService.InputBegan, function(i)
         if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+        local clickOnAnyDropHeader = false
+        for _, ref in ipairs(Win.DropBtns) do
+            if ref.pos and ref.sz and (not ref.active or ref.active()) and over(ref.pos, ref.sz) then
+                clickOnAnyDropHeader = true
+                break
+            end
+        end
         if activeDD then
+            if clickOnAnyDropHeader then return end
             local inList = activeDD.pos and activeDD.sz and over(activeDD.pos, activeDD.sz)
             local inBtn = activeDD.btnPos and activeDD.btnSz and over(activeDD.btnPos, activeDD.btnSz)
             if not inList and not inBtn then
@@ -490,6 +539,12 @@ function Library:CreateWindow(opts)
             local iP    = Vector2.new()
             local isOpen = false
             local isActive = false
+            local ddBtnRef = {
+                pos=nil,
+                sz=nil,
+                active=function() return isActive and Win.Active == parentTab end,
+            }
+            table.insert(Win.DropBtns, ddBtnRef)
             -- Default to first value for single-select
             if not multi and val==nil and vals[1] then val=vals[1] end
 
@@ -593,6 +648,8 @@ function Library:CreateWindow(opts)
                 dBg.Position=fv(p+Vector2.new(IP,24))
                 dVal.Position=fv(p+Vector2.new(IP+7,28))
                 dArr.Position=fv(p+Vector2.new(IP+dW-14,28))
+                ddBtnRef.pos = dBg.Position
+                ddBtnRef.sz  = dBg.Size
             end
 
             on(UserInputService.InputBegan, function(i)

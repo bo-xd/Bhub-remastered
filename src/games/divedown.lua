@@ -158,7 +158,8 @@ return function(Window, ESP, Library)
                         if match then
                             local m, r = getFishData(v)
                             if checkFilters(m, r, mFilters, rFilters) then
-                                local p = v:FindFirstChildOfClass("ProximityPrompt", true)
+                                local root = v:FindFirstChild("RootPart") or v:FindFirstChildWhichIsA("BasePart", true)
+                                local p = (root and root:FindFirstChildWhichIsA("ProximityPrompt", true)) or v:FindFirstChildWhichIsA("ProximityPrompt", true)
                                 if p and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                                     p.HoldDuration = 0; p.MaxActivationDistance = 9e9; p.Enabled = true
                                     player.Character.HumanoidRootPart.CFrame = v:GetPivot() * CFrame.new(0, 3, 0)
@@ -244,14 +245,51 @@ return function(Window, ESP, Library)
     local ShopGroup = MiscTab:AddRightGroupbox('Auto Shop')
     ShopGroup:AddToggle('AutoTreats', { Text = 'Auto Buy Treats', Default = false, Callback = function(v) autoShopTreats = v end })
     ShopGroup:AddToggle('AutoTools', { Text = 'Auto Buy Tools', Default = false, Callback = function(v) autoShopTools = v end })
+
+    local function fireBuyItem(storeName, itemName)
+        pcall(function()
+            local str = string.char(4) .. string.char(#storeName) .. storeName .. string.char(#itemName) .. itemName
+            RS:WaitForChild("Packets"):WaitForChild("Packet"):WaitForChild("RemoteEvent"):FireServer(buffer.fromstring(str))
+        end)
+    end
     
     task.spawn(function()
-        local Client = player.PlayerScripts:WaitForChild("Client")
-        local Net = require(Client).Network
         while true do
-            task.wait(5)
-            if autoShopTreats then pcall(function() Net.Invoke("BuyItem", "Treats", "Super Treat") end) end
-            if autoShopTools then pcall(function() Net.Invoke("BuyItem", "Tools", "Master Tool") end) end
+            task.wait(3)
+            pcall(function()
+                local pgui = player:WaitForChild("PlayerGui")
+                local ui = pgui:FindFirstChild("PersistentUI")
+                if not ui then return end
+
+                local function buyFromShop(shopKey, storeName)
+                    local shops = ui:FindFirstChild("Shops")
+                    if not shops then return end
+                    local shop = shops:FindFirstChild(shopKey)
+                    local content = shop and shop:FindFirstChild("Content")
+                    local scroll = content and content:FindFirstChild("ScrollingFrame")
+                    if not scroll then return end
+
+                    for _, itemFrame in pairs(scroll:GetChildren()) do
+                        if itemFrame:IsA("Frame") or itemFrame:IsA("ImageButton") or itemFrame:IsA("TextButton") then
+                            local slot = itemFrame:FindFirstChild("SlotTemplate")
+                            local stockLabel = slot and slot:FindFirstChild("StockAmount")
+                            if stockLabel and stockLabel:IsA("TextLabel") then
+                                local stockNum = tonumber(string.match(stockLabel.Text, "%d+"))
+                                if stockNum and stockNum > 0 then
+                                    for _i = 1, stockNum do
+                                        if (storeName == "Treat" and not autoShopTreats) or (storeName == "Tool" and not autoShopTools) then break end
+                                        fireBuyItem(storeName, itemFrame.Name)
+                                        task.wait(0.1)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+
+                if autoShopTreats then buyFromShop("Treat", "Treat") end
+                if autoShopTools then buyFromShop("Tool", "Tool") end
+            end)
         end
     end)
 
@@ -275,6 +313,117 @@ return function(Window, ESP, Library)
     end)
 
     local AqGroup = AquariumTab:AddLeftGroupbox('Aquarium')
-    AqGroup:AddButton({ Text = 'Equip Best Fish', Func = function() require(player.PlayerScripts.Client).Network.Invoke("RequestEquipBestFish") end })
-    AqGroup:AddDropdown('SellRarity', { Values = {"Common", "Rare", "Epic", "Legendary", "Mythical"}, Default = "Common", Multi = false, Text = 'Smart Sell Rarity', Callback = function(v) require(player.PlayerScripts.Client).Network.Invoke("SellFishByRarity", v) end })
+
+    local function equipBestFish()
+        pcall(function()
+            local netW = workspace:FindFirstChild("Network")
+            if netW then
+                local remote = netW:FindFirstChild("RequestEquipBestFish-RemoteFunction") or netW:FindFirstChild("RequestEquipBestFish")
+                if remote then
+                    if remote:IsA("RemoteFunction") then
+                        remote:InvokeServer()
+                    elseif remote:IsA("RemoteEvent") then
+                        remote:FireServer()
+                    end
+                end
+            end
+        end)
+        pcall(function()
+            require(player.PlayerScripts.Client).Network.Invoke("RequestEquipBestFish")
+        end)
+    end
+
+    local autoEquipBest = false
+    AqGroup:AddButton({ Text = 'Equip Best Fish', Func = equipBestFish })
+    AqGroup:AddToggle('AutoEquipBest', { Text = 'Always Equip Best Fish', Default = false, Callback = function(v) autoEquipBest = v end })
+
+    task.spawn(function()
+        while true do
+            task.wait(3)
+            if autoEquipBest then
+                equipBestFish()
+            end
+        end
+    end)
+
+    local function getFishRarity(tool)
+        for _, child in pairs(tool:GetChildren()) do
+            if child:IsA("BasePart") then
+                local bg = child:FindFirstChild("BillboardGui")
+                local frame = bg and bg:FindFirstChild("Frame")
+                local rarity = frame and frame:FindFirstChild("Rarity")
+                if rarity and rarity:IsA("TextLabel") then
+                    return rarity.Text:gsub("<[^>]+>", "")
+                end
+            end
+        end
+        local fromName = tool.Name:match("%[(.-)%]")
+        return fromName or "Unknown"
+    end
+
+    local function selectedContains(filterTable, value)
+        if type(filterTable) ~= "table" then return false end
+        local needle = tostring(value):lower()
+        for k, v in pairs(filterTable) do
+            local current = type(k) == "number" and v or k
+            if type(current) == "string" then
+                local active = (type(k) == "number") or (v == true)
+                if active and current:lower() == needle then
+                    return true
+                end
+            end
+        end
+        return false
+    end
+
+    local function hasAnySelected(filterTable)
+        if type(filterTable) ~= "table" then return false end
+        for k, v in pairs(filterTable) do
+            if type(k) == "number" then return true end
+            if type(k) == "string" and v == true then return true end
+        end
+        return false
+    end
+
+    local function equipAndSell(tool)
+        pcall(function()
+            local char = player.Character
+            if not char then return end
+            tool.Parent = char
+            task.wait(0.1)
+            RS:WaitForChild("Packets"):WaitForChild("Packet"):WaitForChild("RemoteEvent"):FireServer(
+                buffer.fromstring("\002\001\013"),
+                {player}
+            )
+        end)
+    end
+
+    local smartSellEnabled = false
+    local smartSellRarities = {}
+    AqGroup:AddDropdown('SmartSellRarity', {
+        Values = {"Normal", "Common", "Rare", "Epic", "Legendary", "Mythical", "Secret", "Divine"},
+        Default = {},
+        Multi = true,
+        Text = 'Smart Sell Rarity'
+        ,Callback = function(v) smartSellRarities = v end
+    })
+    AqGroup:AddToggle('SmartSellToggle', { Text = 'Smart Sell Fish', Default = false, Callback = function(v) smartSellEnabled = v end })
+
+    task.spawn(function()
+        while true do
+            task.wait(5)
+            if smartSellEnabled and hasAnySelected(smartSellRarities) then
+                for _, tool in pairs(player.Backpack:GetChildren()) do
+                    if not smartSellEnabled then break end
+                    if tool:IsA("Tool") then
+                        local rarity = getFishRarity(tool)
+                        if selectedContains(smartSellRarities, rarity) then
+                            equipAndSell(tool)
+                            task.wait(0.2)
+                        end
+                    end
+                end
+            end
+        end
+    end)
 end
