@@ -209,17 +209,40 @@ return function(Window, ESP, Library)
     local MiscUtils = MiscTab:AddLeftGroupbox('Utilities')
     local TimerLabel = MiscUtils:AddLabel('Timers Loading...')
     task.spawn(function()
-        local function getVal(m) if not m then return 0 end return m.NextSpawn or m.SpawnTime or m.Time or m.time or 0 end
+        local function getVal(m)
+            if not m then return 0 end
+            -- try schedule-style API first
+            if type(m.NextBloopSpawn) == "function" then
+                local ok, nextT = pcall(function() return m.NextBloopSpawn(os.time()) end)
+                if ok and type(nextT) == "number" then return nextT end
+            end
+            if type(m.NextMermaidSpawn) == "function" then
+                local ok, nextT = pcall(function() return m.NextMermaidSpawn(os.time()) end)
+                if ok and type(nextT) == "number" then return nextT end
+            end
+            -- fallbacks
+            return m.NextSpawn or m.SpawnTime or m.Time or m.time or 0
+        end
+
         while true do
             task.wait(1)
             local bMod = RS.Modules:FindFirstChild("BloopSpawnSchedule")
             local mMod = RS.Modules:FindFirstChild("MermaidSpawnSchedule")
             if bMod and mMod then
-                local bS = require(bMod); local mS = require(mMod)
-                local bT = math.max(0, math.floor(getVal(bS) - os.time()))
-                local mT = math.max(0, math.floor(getVal(mS) - os.time()))
-                TimerLabel:SetText(string.format("Bloop: %ds | Mermaid: %ds", bT, mT))
-            else TimerLabel:SetText("Searching for Schedule Modules...") end
+                local okB, bS = pcall(function() return require(bMod) end)
+                local okM, mS = pcall(function() return require(mMod) end)
+                if okB and okM and bS and mS then
+                    local bNext = getVal(bS)
+                    local mNext = getVal(mS)
+                    local bT = math.max(0, math.floor(bNext - os.time()))
+                    local mT = math.max(0, math.floor(mNext - os.time()))
+                    TimerLabel:SetText(string.format("Bloop: %ds | Mermaid: %ds", bT, mT))
+                else
+                    TimerLabel:SetText("Searching for Schedule Modules...")
+                end
+            else
+                TimerLabel:SetText("Searching for Schedule Modules...")
+            end
         end
     end)
 
@@ -272,39 +295,37 @@ return function(Window, ESP, Library)
                     if not scroll then return end
 
                     for _, itemFrame in pairs(scroll:GetChildren()) do
-                        if itemFrame:IsA("Frame") or itemFrame:IsA("ImageButton") or itemFrame:IsA("TextButton") then
-                            local slot = itemFrame:FindFirstChild("SlotTemplate")
-                            local stockLabel = slot and slot:FindFirstChild("StockAmount")
-                            if stockLabel and stockLabel:IsA("TextLabel") then
-                                local txt = tostring(stockLabel.Text or "")
-                                local stockNum = tonumber(txt:match("%d+")) or 0
-                                -- skip if no numeric stock detected
-                                if stockNum <= 0 then
-                                    -- nothing to buy
-                                else
-                                    -- simple rate-limit per item to avoid spamming when purchases fail
-                                    local last = buyCache[itemFrame.Name]
-                                    if last and tick() - last < 5 then
-                                        -- recently attempted buy for this item, skip
-                                    else
-                                        -- clear known-empty marker when stock appears
-                                        local key = storeName..":"..tostring(itemFrame.Name)
-                                        knownEmpty[key] = nil
-                                        -- attempt to buy a single unit (safer) and rate-limit to avoid spamming
-                                        if not buyCache[key] or (tick() - buyCache[key] >= 30) then
-                                            if not ((storeName == "Treat" and not autoShopTreats) or (storeName == "Tool" and not autoShopTools)) then
-                                                fireBuyItem(storeName, itemFrame.Name)
-                                                buyCache[key] = tick()
-                                            end
-                                        end
-                                    end
-                                end
-                            -- if no numeric stock text, mark as known empty so we don't retry constantly
+                        if not (itemFrame:IsA("Frame") or itemFrame:IsA("ImageButton") or itemFrame:IsA("TextButton")) then continue end
+                        local slot = itemFrame:FindFirstChild("SlotTemplate")
+                        local stockLabel = slot and slot:FindFirstChild("StockAmount")
+                        local key = storeName..":"..tostring(itemFrame.Name)
+
+                        -- Skip if we've marked this item known-empty
+                        if knownEmpty[key] then continue end
+
+                        if stockLabel and stockLabel:IsA("TextLabel") then
+                            local txt = tostring(stockLabel.Text or "")
+                            local stockNum = tonumber(txt:match("%d+")) or 0
+
+                            -- If no numeric stock found, mark as empty and skip
                             if stockNum <= 0 then
-                                local key = storeName..":"..tostring(itemFrame.Name)
                                 knownEmpty[key] = true
+                                continue
                             end
-                            end
+
+                            -- Clear known-empty marker since numeric stock is present
+                            knownEmpty[key] = nil
+
+                            -- Respect toggles
+                            if (storeName == "Treat" and not autoShopTreats) or (storeName == "Tool" and not autoShopTools) then continue end
+
+                            -- Rate-limit per item key (30s)
+                            local last = buyCache[key]
+                            if last and tick() - last < 30 then continue end
+
+                            -- Buy one unit (safer), record attempt
+                            fireBuyItem(storeName, itemFrame.Name)
+                            buyCache[key] = tick()
                         end
                     end
                 end
