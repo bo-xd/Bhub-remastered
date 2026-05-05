@@ -140,6 +140,11 @@ AppearanceGroup:AddDropdown('ThemeSelect', {
     end
 })
 
+-- Allow toggling the window backdrop shadow
+AppearanceGroup:AddToggle('WindowShadow', { Text = 'Window Shadow', Default = true, Callback = function(v)
+    if Window and Window.SetShadowEnabled then Window:SetShadowEnabled(v) end
+end })
+
 -- Simple menu toggle - check for Delete key (default keybind)
 UserInputService.InputBegan:Connect(function(inp, gp)
     if gp then return end

@@ -152,10 +152,11 @@ function Library:CreateWindow(opts)
     local Win = {
         Pos=Vector2.new(100,100), Tabs={}, Active=nil,
         Dragging=false, Resizing=false, DragOff=Vector2.new(), ResizeStartMouse=Vector2.new(), ResizeStartSize=Vector2.new(), Btns={}, DropBtns={}, Visible=true,
+        ShadowEnabled = true,
     }
 
     -- Chrome (title bar + tab strip)
-    local wShd  = d("Square",{Filled=true, ZIndex=9, Rounding=10, Color=Color3.new(0,0,0), Transparency=0.65, Visible=true,Position=Win.Pos+Vector2.new(4,4),Size=Vector2.new(W,BAR)})
+    local wShd  = d("Square",{Filled=true, ZIndex=9, Rounding=10, Color=Color3.new(0,0,0), Transparency=0.35, Visible=true,Position=Win.Pos+Vector2.new(4,4),Size=Vector2.new(W,BAR)})
     local wBg   = d("Square",{Filled=true, ZIndex=10,Rounding=10,Color=T().Bg,    Visible=true,Position=Win.Pos,Size=Vector2.new(W,BAR)})
     local wOut  = d("Square",{Filled=false,ZIndex=10,Rounding=10,Thickness=1,Color=T().GroupBorder,Visible=true,Position=Win.Pos,Size=Vector2.new(W,BAR)})
     local wBar  = d("Square",{Filled=true, ZIndex=11,Rounding=10,Color=T().Bar,   Visible=true,Position=Win.Pos,Size=Vector2.new(W,BAR)})
@@ -201,6 +202,8 @@ function Library:CreateWindow(opts)
 
     -- ── Layout (handles dynamic multi-row tab strip) ───────────────────────────
     local function layout()
+        -- Recalculate column width based on current window width so children reflow on resize
+        COL = math.floor((W - PAD*2 - GAP) / 2)
         -- Calculate tab rows
         local tabRows, tx = 1, 10
         for _, btn in ipairs(Win.Btns) do
@@ -256,6 +259,8 @@ function Library:CreateWindow(opts)
         wBg.Size = fv(Vector2.new(W, math.max(contentH, userMinH)))
         wOut.Size = wBg.Size
         wShd.Size = fv(wBg.Size + Vector2.new(0, 2))
+        -- Shadow visibility controlled by window setting (user can toggle)
+        pcall(function() wShd.Visible = Win.ShadowEnabled end)
         wGrip.Position = fv(wBg.Position + wBg.Size - Vector2.new(14,14))
         wGrip2.Position = fv(wBg.Position + wBg.Size - Vector2.new(10,10))
     end
@@ -645,9 +650,12 @@ function Library:CreateWindow(opts)
             end
             function it.setPos(p)
                 iP=p; lbl.Position=fv(p+Vector2.new(IP,5))
+                -- compute current dropdown width based on current column width so it reflows on resize
+                local curDW = math.max(48, COL - IP*2)
                 dBg.Position=fv(p+Vector2.new(IP,24))
+                dBg.Size = fv(Vector2.new(curDW,24))
                 dVal.Position=fv(p+Vector2.new(IP+7,28))
-                dArr.Position=fv(p+Vector2.new(IP+dW-14,28))
+                dArr.Position=fv(p+Vector2.new(IP+curDW-14,28))
                 ddBtnRef.pos = dBg.Position
                 ddBtnRef.sz  = dBg.Size
             end
@@ -827,6 +835,13 @@ function Library:CreateWindow(opts)
     -- Expose visibility toggle on window
     function Win:SetVisible(v)
         setVisible(v)
+    end
+
+    -- Allow toggling the backdrop shadow (user preference)
+    function Win:SetShadowEnabled(v)
+        Win.ShadowEnabled = not not v
+        pcall(function() wShd.Visible = Win.ShadowEnabled end)
+        layout()
     end
 
     layout(); return Win
