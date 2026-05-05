@@ -199,7 +199,19 @@ return function(Window, ESP, Library)
             else for _, f in pairs(Fish:GetChildren()) do pcall(function() ESP:Remove(f) end) end end
             if areaEspEnabled then
                 for name, pos in pairs(HardcodedZones) do
-                    local node = Markers:FindFirstChild(name) or Instance.new("Part", workspace); node.Name = name; node.Transparency = 1; node.Anchored = true; node.CFrame = CFrame.new(pos)
+                    local node = Markers:FindFirstChild(name)
+                    if not node then
+                        node = Instance.new("Part")
+                        node.Name = name
+                        node.Transparency = 1
+                        node.Anchored = true
+                        node.CanCollide = false
+                        node.CanTouch = false
+                        node.CanQuery = false
+                        node.Size = Vector3.new(1, 1, 1)
+                        node.Parent = Markers
+                    end
+                    node.CFrame = CFrame.new(pos)
                     if not ESP.Objects[node] then ESP:Add(node, { Name = name, Color = Color3.fromRGB(0, 255, 255), TextOnly = true, IsEnabled = function() return areaEspEnabled end }) end
                 end
             else for name, _ in pairs(HardcodedZones) do local node = Markers:FindFirstChild(name); if node then pcall(function() ESP:Remove(node) end) end end end
