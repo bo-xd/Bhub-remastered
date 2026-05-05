@@ -570,7 +570,7 @@ function Library:CreateWindow(opts)
             function it.setVis(v)
                 lbl.Visible=v; dBg.Visible=v; dVal.Visible=v; dArr.Visible=v
                 isActive=v
-                if not v and isOpen then closeDD(); if activeDD == dBg then activeDD=nil end end
+                if not v and isOpen then closeDD(); activeDD=nil end
             end
             function it.setPos(p)
                 iP=p; lbl.Position=fv(p+Vector2.new(IP,5))
@@ -753,32 +753,35 @@ function Library:CreateWindow(opts)
 
     -- ── Settings injected last via defer ──────────────────────────────────────
     -- Merges into an existing "UI Settings"/"Settings" tab if present, or creates one
-    task.defer(function()
-        local st = nil
-        for _, tab in ipairs(Win.Tabs) do
-            if tab.Name and tab.Name:lower():find("setting") then st=tab; break end
-        end
-        if not st then st = Win:AddTab("Settings") end
+    if not Win._settingsAdded then
+        task.defer(function()
+            local st = nil
+            for _, tab in ipairs(Win.Tabs) do
+                if tab.Name and tab.Name:lower():find("setting") then st=tab; break end
+            end
+            if not st then st = Win:AddTab("Settings") end
 
-        local tg = st:AddLeftGroupbox("Appearance")
-        local tNames = {}
-        for k in pairs(Library.Themes) do table.insert(tNames,k) end; table.sort(tNames)
-        tg:AddDropdown("_theme",{Values=tNames,Default=Library.CurrentThemeName,Text="Color Theme",
-            Callback=function(v) Library:SetTheme(v) end})
-        tg:AddLabel("Menu visibility"):AddKeyPicker("_menuKey",{Default="Insert",
-            OnKey=function() setVisible(not Win.Visible) end})
+            local tg = st:AddLeftGroupbox("Appearance")
+            local tNames = {}
+            for k in pairs(Library.Themes) do table.insert(tNames,k) end; table.sort(tNames)
+            tg:AddDropdown("_theme",{Values=tNames,Default=Library.CurrentThemeName,Text="Color Theme",
+                Callback=function(v) Library:SetTheme(v) end})
+            tg:AddLabel("Menu visibility"):AddKeyPicker("_menuKey",{Default="Insert",
+                OnKey=function() setVisible(not Win.Visible) end})
 
-        local cg = st:AddRightGroupbox("Config")
-        cg:AddButton({Text="Save Config",Func=function()
-            if Library:SaveConfig("default") then Library:Notify("Config saved!")
-            else Library:Notify("Save failed (no writefile)") end
-        end})
-        cg:AddButton({Text="Load Config",Func=function()
-            if Library:LoadConfig("default") then Library:Notify("Config loaded!")
-            else Library:Notify("No config found") end
-        end})
-        cg:AddLabel("Path: BHub-remastered/configs/")
-    end)
+            local cg = st:AddRightGroupbox("Config")
+            cg:AddButton({Text="Save Config",Func=function()
+                if Library:SaveConfig("default") then Library:Notify("Config saved!")
+                else Library:Notify("Save failed (no writefile)") end
+            end})
+            cg:AddButton({Text="Load Config",Func=function()
+                if Library:LoadConfig("default") then Library:Notify("Config loaded!")
+                else Library:Notify("No config found") end
+            end})
+            cg:AddLabel("Path: BHub-remastered/configs/")
+            Win._settingsAdded = true
+        end)
+    end
 
     layout(); return Win
 end
