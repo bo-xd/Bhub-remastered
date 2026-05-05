@@ -247,6 +247,7 @@ return function(Window, ESP, Library)
     ShopGroup:AddToggle('AutoTools', { Text = 'Auto Buy Tools', Default = false, Callback = function(v) autoShopTools = v end })
 
     local buyCache = {}
+    local knownEmpty = {}
     local function fireBuyItem(storeName, itemName)
         pcall(function()
             local str = string.char(4) .. string.char(#storeName) .. storeName .. string.char(#itemName) .. itemName
@@ -286,15 +287,23 @@ return function(Window, ESP, Library)
                                     if last and tick() - last < 5 then
                                         -- recently attempted buy for this item, skip
                                     else
-                                        -- attempt to buy up to stockNum times but respect toggles
-                                        for _i = 1, stockNum do
-                                            if (storeName == "Treat" and not autoShopTreats) or (storeName == "Tool" and not autoShopTools) then break end
-                                            fireBuyItem(storeName, itemFrame.Name)
-                                            task.wait(0.1)
+                                        -- clear known-empty marker when stock appears
+                                        local key = storeName..":"..tostring(itemFrame.Name)
+                                        knownEmpty[key] = nil
+                                        -- attempt to buy a single unit (safer) and rate-limit to avoid spamming
+                                        if not buyCache[key] or (tick() - buyCache[key] >= 30) then
+                                            if not ((storeName == "Treat" and not autoShopTreats) or (storeName == "Tool" and not autoShopTools)) then
+                                                fireBuyItem(storeName, itemFrame.Name)
+                                                buyCache[key] = tick()
+                                            end
                                         end
-                                        buyCache[itemFrame.Name] = tick()
                                     end
                                 end
+                            -- if no numeric stock text, mark as known empty so we don't retry constantly
+                            if stockNum <= 0 then
+                                local key = storeName..":"..tostring(itemFrame.Name)
+                                knownEmpty[key] = true
+                            end
                             end
                         end
                     end
