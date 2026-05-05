@@ -8,6 +8,7 @@ local ESP = {
 	ShowNames = true,
 	ShowDistance = true,
 	ShowHealth = true,
+    ShowTracers = false,
 	BoxColor = Color3.fromRGB(255, 255, 255),
 	TextColor = Color3.fromRGB(255, 255, 255),
 	TextSize = 13,
@@ -51,6 +52,7 @@ function ESP:Add(object, options)
 		Hp      = newDrawing("Square", { Thickness=1, Color=Color3.fromRGB(0,200,0), Transparency=1, Filled=true,  Visible=false }),
 		Name    = newDrawing("Text",   { Text=name,  Color=color, Center=true, Outline=true, Size=self.TextSize, Font=self.TextFont, Visible=false }),
 		Dist    = newDrawing("Text",   { Text="",    Color=color, Center=true, Outline=true, Size=self.TextSize, Font=self.TextFont, Visible=false }),
+		Tracer  = newDrawing("Line",   { From=Vector2.new(0,0), To=Vector2.new(0,0), Color=color, Thickness=1, Transparency=1, Visible=false }),
 	}
 
 	self.Objects[object] = {
@@ -181,6 +183,17 @@ function ESP:Update()
 				c.Dist.Color    = textColor
 				c.Dist.Position = Vector2.new(x + width * 0.5, y + height + 2)
 			end
+		end
+
+		-- Tracer (line from screen center to top of target)
+		if self.ShowTracers then
+			local center = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
+			c.Tracer.Visible = true
+			c.Tracer.Color = color
+			c.Tracer.From = center
+			c.Tracer.To = Vector2.new(topVP.X, topVP.Y)
+		else
+			c.Tracer.Visible = false
 		end
 	end
 end

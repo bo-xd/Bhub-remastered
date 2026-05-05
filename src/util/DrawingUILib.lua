@@ -220,12 +220,16 @@ function Library:CreateWindow(opts)
         wShd.Size     = fv(Vector2.new(W, dynTH + BAR + 3))
         wBg.Position  = fv(Win.Pos)
         wBar.Position = fv(Win.Pos)
+        wBar.Size     = fv(Vector2.new(W, BAR))
         wOut.Position = fv(Win.Pos)
         wBBt.Position = fv(Win.Pos + Vector2.new(0, BAR-4))
+        wBBt.Size     = fv(Vector2.new(W, 4))
         wAcc.Position = fv(Win.Pos + Vector2.new(0, BAR))
+        wAcc.Size     = fv(Vector2.new(W, 2))
         wTBg.Position = fv(Win.Pos + Vector2.new(0, BAR+2))
         wTBg.Size     = fv(Vector2.new(W, dynTH))
         wTSep.Position= fv(Win.Pos + Vector2.new(0, dynHDR))
+        wTSep.Size    = fv(Vector2.new(W, 1))
         wTit.Position = fv(Win.Pos + Vector2.new(13, 8))
 
         -- Tab button positions (wrap to next row when overflow)
@@ -594,6 +598,8 @@ function Library:CreateWindow(opts)
                 for _,row in ipairs(pool) do
                     row.bg.Visible=false; row.chk.Visible=false; row.box.Visible=false; row.txt.Visible=false
                 end
+                -- clear active reference so other dropdowns can respond
+                pcall(function() Win._activeDropRef = nil end)
             end
 
             local function openDD()
@@ -601,15 +607,17 @@ function Library:CreateWindow(opts)
                 if activeDD then activeDD.close(); activeDD=nil end
                 isOpen=true; pcall(function() dBg.Color=T().Accent end); dArr.Text="▴"
                 local count  = math.min(#vals, MAXDD)
+                local scrollIndex = 1
                 if count == 0 then return end  -- No items to show
                 local listH  = count * DD_H + 6
                 local vp     = pcall(function() return workspace.CurrentCamera.ViewportSize end) and workspace.CurrentCamera.ViewportSize or Vector2.new(1920,1080)
                 local baseY  = dBg.Position.Y + dBg.Size.Y + 3
                 if baseY + listH > vp.Y - 10 then baseY = dBg.Position.Y - listH - 3 end
-                local lx, lw = dBg.Position.X, dW
+                local lx, lw = dBg.Position.X, dBg.Size.X
                 lBg.Position =fv(Vector2.new(lx,baseY)); lBg.Size =fv(Vector2.new(lw,listH))
                 lOut.Position=fv(Vector2.new(lx,baseY)); lOut.Size=fv(Vector2.new(lw,listH))
                 lBg.Visible=true; lOut.Visible=true
+                -- show the first `count` rows; scrolling will offset this window over `vals`
                 for i=1, count do
                     local row = pool[i]
                     local v = vals[i]
@@ -634,13 +642,18 @@ function Library:CreateWindow(opts)
                         row.txt.Text=tostring(v); row.txt.Visible=true
                     end
                 end
+                -- scrolling state (1-based start index into vals)
+                local scrollState = {index = 1, visible = count}
                 activeDD = {
                     close=closeDD,
                     pos=fv(Vector2.new(lx,baseY)),
                     sz=fv(Vector2.new(lw,listH)),
                     btnPos=dBg.Position,
                     btnSz=dBg.Size,
+                    scroll=scrollState,
                 }
+                -- mark this dropdown's button ref as the current active dropdown
+                pcall(function() Win._activeDropRef = ddBtnRef end)
             end
 
             local it = {h=52}
@@ -666,20 +679,24 @@ function Library:CreateWindow(opts)
                 if Win.Active ~= parentTab or not isActive then return end
                 -- Toggle the header button
                 if dBg and dBg.Position and dBg.Size and over(dBg.Position, dBg.Size) then
+                    -- if another dropdown is currently open, ignore header clicks on this one
+                    if activeDD and Win._activeDropRef and Win._activeDropRef ~= ddBtnRef then return end
                     if isOpen then closeDD(); activeDD=nil else openDD() end
                     return
                 end
                 -- Click a list item
                 if isOpen then
+                    local scrollIdx = activeDD and activeDD.scroll and activeDD.scroll.index or 1
                     for idx, row in ipairs(pool) do
-                        if vals[idx] and over(row.bg.Position, row.bg.Size) then
-                            local v = vals[idx]
+                        local actualIdx = scrollIdx + idx - 1
+                        if vals[actualIdx] and over(row.bg.Position, row.bg.Size) then
+                            local v = vals[actualIdx]
                             if multi then
                                 if type(val) ~= "table" then val={} end
                                 -- Toggle: set to true if not set, remove if true
                                 if val[v] then val[v]=nil else val[v]=true end
                                 dVal.Text = display()
-                                openDD()  -- refresh list in place
+                                openDD()  -- refresh list in place (will re-evaluate visible window)
                             else
                                 val=v; dVal.Text=display(); closeDD(); activeDD=nil
                             end
@@ -693,13 +710,64 @@ function Library:CreateWindow(opts)
             -- Hover highlight on RenderStepped
             on(RunService.RenderStepped, function()
                 if not isOpen then return end
+                local scrollIdx = activeDD and activeDD.scroll and activeDD.scroll.index or 1
                 for idx, row in ipairs(pool) do
-                    local v = vals[idx]
+                    local actualIdx = scrollIdx + idx - 1
+                    local v = vals[actualIdx]
                     if v and row.bg.Visible then
                         local sel = multi and (type(val)=="table" and val[v]==true) or (val==v)
                         row.bg.Color = over(row.bg.Position, row.bg.Size) and T().DropHover or (sel and T().DropSel or T().DropItem)
+                        row.txt.Text = tostring(v)
                     end
                 end
+            end)
+
+            -- Mouse wheel to scroll dropdown when open
+            on(UserInputService.InputChanged, function(i)
+                if i.UserInputType ~= Enum.UserInputType.MouseWheel then return end
+                if not activeDD or not isOpen then return end
+                -- only scroll when mouse is over the list area or the dropdown button
+                local overList = activeDD.pos and activeDD.sz and over(activeDD.pos, activeDD.sz)
+                local overBtn = activeDD.btnPos and activeDD.btnSz and over(activeDD.btnPos, activeDD.btnSz)
+                if not overList and not overBtn then return end
+                local s = activeDD.scroll
+                if not s then return end
+                local delta = 0
+                if i.Position and i.Position.Z then
+                    if i.Position.Z > 0 then delta = -1 elseif i.Position.Z < 0 then delta = 1 end
+                end
+                if delta == 0 then return end
+                local maxStart = math.max(1, #vals - s.visible + 1)
+                s.index = math.clamp(s.index + delta, 1, maxStart)
+                -- refresh visible rows according to new s.index
+                local lx, lw = dBg.Position.X, dBg.Size.X
+                local baseY = activeDD.pos.Y
+                for i=1, s.visible do
+                    local row = pool[i]
+                    local actual = s.index + i - 1
+                    local v = vals[actual]
+                    if v then
+                        local ry = baseY + 3 + (i-1)*DD_H
+                        row.bg.Position = fv(Vector2.new(lx, ry)); row.bg.Size = Vector2.new(lw, DD_H)
+                        local sel = multi and (type(val)=="table" and val[v]==true) or (val==v)
+                        row.bg.Color = sel and T().DropSel or T().DropItem
+                        row.bg.Visible = true
+                        if multi then
+                            local cx,cy = lx+6, ry+(DD_H-10)/2
+                            if sel then row.chk.Position=fv(Vector2.new(cx,cy)); row.chk.Visible=true; row.box.Visible=false
+                            else row.box.Position=fv(Vector2.new(cx,cy)); row.box.Visible=true; row.chk.Visible=false end
+                            row.txt.Position = fv(Vector2.new(lx+22, ry+(DD_H-13)/2))
+                        else
+                            row.chk.Visible=false; row.box.Visible=false
+                            row.txt.Position = fv(Vector2.new(lx+10, ry+(DD_H-13)/2))
+                        end
+                        row.txt.Text = tostring(v); row.txt.Visible=true
+                    else
+                        row.bg.Visible = false; row.chk.Visible=false; row.box.Visible=false; row.txt.Visible=false
+                    end
+                end
+                -- update activeDD scroll state
+                activeDD.scroll = s
             end)
 
             local Drop = {}

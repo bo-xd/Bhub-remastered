@@ -200,7 +200,7 @@ return function(Window, ESP, Library)
             if areaEspEnabled then
                 for name, pos in pairs(HardcodedZones) do
                     local node = Markers:FindFirstChild(name) or Instance.new("Part", workspace); node.Name = name; node.Transparency = 1; node.Anchored = true; node.CFrame = CFrame.new(pos)
-                    if not ESP.Objects[node] then ESP:Add(node, { Name = name, Color = Color3.fromRGB(0, 255, 255), IsEnabled = function() return areaEspEnabled end }) end
+                    if not ESP.Objects[node] then ESP:Add(node, { Name = name, Color = Color3.fromRGB(0, 255, 255), TextOnly = true, IsEnabled = function() return areaEspEnabled end }) end
                 end
             else for name, _ in pairs(HardcodedZones) do local node = Markers:FindFirstChild(name); if node then pcall(function() ESP:Remove(node) end) end end end
         end
@@ -246,6 +246,7 @@ return function(Window, ESP, Library)
     ShopGroup:AddToggle('AutoTreats', { Text = 'Auto Buy Treats', Default = false, Callback = function(v) autoShopTreats = v end })
     ShopGroup:AddToggle('AutoTools', { Text = 'Auto Buy Tools', Default = false, Callback = function(v) autoShopTools = v end })
 
+    local buyCache = {}
     local function fireBuyItem(storeName, itemName)
         pcall(function()
             local str = string.char(4) .. string.char(#storeName) .. storeName .. string.char(#itemName) .. itemName
@@ -274,12 +275,24 @@ return function(Window, ESP, Library)
                             local slot = itemFrame:FindFirstChild("SlotTemplate")
                             local stockLabel = slot and slot:FindFirstChild("StockAmount")
                             if stockLabel and stockLabel:IsA("TextLabel") then
-                                local stockNum = tonumber(string.match(stockLabel.Text, "%d+"))
-                                if stockNum and stockNum > 0 then
-                                    for _i = 1, stockNum do
-                                        if (storeName == "Treat" and not autoShopTreats) or (storeName == "Tool" and not autoShopTools) then break end
-                                        fireBuyItem(storeName, itemFrame.Name)
-                                        task.wait(0.1)
+                                local txt = tostring(stockLabel.Text or "")
+                                local stockNum = tonumber(txt:match("%d+")) or 0
+                                -- skip if no numeric stock detected
+                                if stockNum <= 0 then
+                                    -- nothing to buy
+                                else
+                                    -- simple rate-limit per item to avoid spamming when purchases fail
+                                    local last = buyCache[itemFrame.Name]
+                                    if last and tick() - last < 5 then
+                                        -- recently attempted buy for this item, skip
+                                    else
+                                        -- attempt to buy up to stockNum times but respect toggles
+                                        for _i = 1, stockNum do
+                                            if (storeName == "Treat" and not autoShopTreats) or (storeName == "Tool" and not autoShopTools) then break end
+                                            fireBuyItem(storeName, itemFrame.Name)
+                                            task.wait(0.1)
+                                        end
+                                        buyCache[itemFrame.Name] = tick()
                                     end
                                 end
                             end
