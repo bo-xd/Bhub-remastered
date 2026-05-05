@@ -821,13 +821,6 @@ function Library:CreateWindow(opts)
             function Tog:AddColorPicker(id, co)
                 co = co or {}
                 local pickerColor = co.Default or Color3.new(1, 1, 1)
-                local colorIndex = 1
-                for i, c in ipairs(colorPresets) do
-                    if c == pickerColor then
-                        colorIndex = i
-                        break
-                    end
-                end
                 local swatch = d("Square", {Size=Vector2.new(16, 16), Filled=true, ZIndex=22, Rounding=4, Color=pickerColor, Visible=false})
                 local border = d("Square", {Size=Vector2.new(16, 16), Filled=false, ZIndex=23, Rounding=4, Thickness=1, Color=T().GroupBorder, Visible=false})
                 local it2 = {h=28}
@@ -836,28 +829,168 @@ function Library:CreateWindow(opts)
                     swatch.Position = fv(p + Vector2.new(COL - 24, 6))
                     border.Position = fv(p + Vector2.new(COL - 24, 6))
                 end
-                local function applyColor(c)
+
+                local popup = {
+                    open = false,
+                    panel = nil,
+                    elems = {},
+                }
+
+                local function colorToTable(c)
+                    return {math.floor(c.R*255), math.floor(c.G*255), math.floor(c.B*255)}
+                end
+                local function tableToColor(t)
+                    return Color3.fromRGB(t[1], t[2], t[3])
+                end
+
+                local preview = d("Square", {Size=Vector2.new(36, 22), Filled=true, ZIndex=31, Rounding=4, Color=pickerColor, Visible=false})
+
+                local function applyColor(c, suppressCb)
                     pickerColor = c
                     swatch.Color = c
-                    if co.Callback then co.Callback(c) end
+                    preview.Color = c
+                    if not suppressCb and co.Callback then co.Callback(c) end
                 end
+
+                local function createPopup(pos)
+                    if popup.open then return end
+                    popup.open = true
+                    local pW, pH = 220, 140
+                    local pPos = pos + Vector2.new(-pW, 0)
+                    local panel = d("Square", {Size=Vector2.new(pW, pH), Filled=true, Color=T().GroupBg, Rounding=6, Visible=true, ZIndex=30})
+                    local title = d("Text", {Text=(co.Title or txt), Size=14, Font=FONT, Outline=false, Color=T().Text, Visible=true, ZIndex=31})
+                    local rlbl = d("Text", {Text="R", Size=12, Font=FONT, Outline=false, Color=T().Text, Visible=true, ZIndex=31})
+                    local glbl = d("Text", {Text="G", Size=12, Font=FONT, Outline=false, Color=T().Text, Visible=true, ZIndex=31})
+                    local blbl = d("Text", {Text="B", Size=12, Font=FONT, Outline=false, Color=T().Text, Visible=true, ZIndex=31})
+
+                    panel.Position = fv(pPos)
+                    title.Position = fv(pPos + Vector2.new(10, 6))
+
+                    local sliders = {}
+                    for i=1,3 do
+                        local y = 28 + (i-1)*34
+                        local lbl = (i==1) and rlbl or (i==2) and glbl or blbl
+                        lbl.Position = fv(pPos + Vector2.new(8, y+2))
+                        local sBg = d("Square", {Size=Vector2.new(160, 10), Filled=true, ZIndex=31, Rounding=4, Color=T().SlidBg, Visible=true})
+                        local sF = d("Square", {Size=Vector2.new(0, 10), Filled=true, ZIndex=32, Rounding=4, Color=T().Accent, Visible=true})
+                        local sTh = d("Square", {Size=Vector2.new(10, 14), Filled=true, ZIndex=33, Rounding=4, Color=T().Thumb, Visible=true})
+                        sBg.Position = fv(pPos + Vector2.new(30, y))
+                        sF.Position = fv(sBg.Position)
+                        sTh.Position = fv(sBg.Position + Vector2.new(0, -2))
+
+                        table.insert(sliders, {bg=sBg, fill=sF, th=sTh, value=colorToTable(pickerColor)[i]})
+                    end
+
+                    preview.Position = fv(pPos + Vector2.new(196, 28))
+
+                    local presetObjs = {}
+                    for i, c in ipairs(colorPresets) do
+                        local px = 10 + ((i-1)%5)*36
+                        local py = 112 + math.floor((i-1)/5)*24
+                        local sw = d("Square", {Size=Vector2.new(30, 18), Filled=true, ZIndex=31, Rounding=4, Color=c, Visible=true})
+                        sw.Position = fv(pPos + Vector2.new(px, py))
+                        table.insert(presetObjs, {obj=sw, color=c})
+                    end
+
+                    popup.panel = panel
+                    popup.elems = {title=title, sliders=sliders, preview=preview, presets=presetObjs}
+
+                    local activeSlider = nil
+
+                    local function setSlider(i, v)
+                        v = math.clamp(math.floor(v+0.5), 0, 255)
+                        sliders[i].value = v
+                        local pct = v/255
+                        local sBg = sliders[i].bg
+                        sliders[i].fill.Size = Vector2.new(pct * sBg.Size.X, sBg.Size.Y)
+                        sliders[i].th.Position = fv(sBg.Position + Vector2.new(math.max(0, pct*sBg.Size.X - 5), -2))
+                        local col = tableToColor({sliders[1].value, sliders[2].value, sliders[3].value})
+                        applyColor(col)
+                    end
+
+                    for i=1,3 do setSlider(i, colorToTable(pickerColor)[i]) end
+
+                    local function closePopup()
+                        if not popup.open then return end
+                        popup.open = false
+                        for _,v in pairs(popup.elems) do
+                            if type(v)=="table" then
+                                for _,u in pairs(v) do if u.obj then u.obj.Visible=false end end
+                            end
+                        end
+                        if popup.panel then popup.panel.Visible=false end
+                        popup.panel = nil
+                        popup.elems = {}
+                    end
+
+                    on(UserInputService.InputBegan, function(i)
+                        if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+                        local m = UserInputService:GetMouseLocation()
+                        -- check sliders
+                        for idx, s in ipairs(sliders) do
+                            local p = s.bg.Position; local sz = s.bg.Size
+                            if (m.X >= p.X and m.X <= p.X+sz.X and m.Y >= p.Y and m.Y <= p.Y+sz.Y) then
+                                activeSlider = idx
+                                setSlider(idx, ((m.X - p.X)/sz.X)*255)
+                                return
+                            end
+                        end
+                        -- check presets
+                        for _, pr in ipairs(popup.elems.presets) do
+                            local p = pr.obj.Position; local sz = pr.obj.Size
+                            if (m.X >= p.X and m.X <= p.X+sz.X and m.Y >= p.Y and m.Y <= p.Y+sz.Y) then
+                                setSlider(1, pr.color.R*255); setSlider(2, pr.color.G*255); setSlider(3, pr.color.B*255)
+                                return
+                            end
+                        end
+                        -- click outside closes
+                        local panelP = panel.Position; local panelS = panel.Size
+                        if not (m.X >= panelP.X and m.X <= panelP.X+panelS.X and m.Y >= panelP.Y and m.Y <= panelP.Y+panelS.Y) then
+                            closePopup()
+                        end
+                    end)
+
+                    on(UserInputService.InputChanged, function(i)
+                        if activeSlider and i.UserInputType==Enum.UserInputType.MouseMovement then
+                            local m = UserInputService:GetMouseLocation()
+                            local s = sliders[activeSlider]
+                            local p = s.bg.Position; local sz = s.bg.Size
+                            setSlider(activeSlider, ((m.X - p.X)/sz.X)*255)
+                        end
+                    end)
+
+                    on(UserInputService.InputEnded, function(i)
+                        if i.UserInputType==Enum.UserInputType.MouseButton1 then activeSlider = nil end
+                    end)
+
+                    th(function()
+                        if panel then panel.Color = T().GroupBg end
+                    end)
+                end
+
                 on(UserInputService.InputBegan, function(i)
                     if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
                     if Win.Active ~= parentTab or not isActive then return end
                     if over(swatch.Position, swatch.Size) then
-                        colorIndex = (colorIndex % #colorPresets) + 1
-                        applyColor(colorPresets[colorIndex])
+                        local pos = swatch.Position
+                        createPopup(pos)
                     end
                 end)
+
                 Library:_regCfg(id or (txt .. "Color"), function() return pickerColor end, function(v)
-                    if typeof(v) == "Color3" then
-                        applyColor(v)
-                    end
+                    if typeof(v) == "Color3" then applyColor(v) end
                 end)
-                th(function() border.Color = T().GroupBorder end)
+
+                th(function() border.Color = T().GroupBorder; preview.Color = pickerColor end)
                 addIt(it2)
                 if co.Callback then task.spawn(co.Callback, pickerColor) end
-                return { Value = pickerColor, SetValue = applyColor, OnChanged = function() end }
+
+                local obj = {
+                    Value = pickerColor,
+                    SetValue = function(c) applyColor(c) end,
+                    OnChanged = function() end,
+                }
+                return obj
             end
             function Tog:AddKeyPicker()   return {OnChanged=function()end} end
             Library:_regCfg(id, function() return st end, function(v)
