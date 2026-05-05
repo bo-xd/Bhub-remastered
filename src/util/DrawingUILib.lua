@@ -350,18 +350,19 @@ function Library:CreateWindow(opts)
             local fn  = type(o)=="table" and o.Func or function() end
             local bW  = COL - IP*2
             local iP  = Vector2.new()
+            local isActive = false
             local bg2 = d("Square",{Size=Vector2.new(bW,24),Filled=true,ZIndex=20,Rounding=4,Color=T().Btn,Visible=false})
             local lt  = d("Text",  {Text=txt,Size=14,Font=FONT,Outline=false,Center=true,Color=T().Text,ZIndex=21,Visible=false})
             th(function() bg2.Color=T().Btn; lt.Color=T().Text end)
             local it = {h=32}
-            function it.setVis(v) bg2.Visible=v; lt.Visible=v end
+            function it.setVis(v) bg2.Visible=v; lt.Visible=v; isActive=v end
             function it.setPos(p)
                 iP=p; bg2.Position=fv(p+Vector2.new(IP,4))
                 lt.Position=fv(p+Vector2.new(IP+bW/2, 8))
             end
             on(UserInputService.InputBegan, function(i)
                 if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
-                if Win.Active ~= parentTab then return end
+                if Win.Active ~= parentTab or not isActive then return end
                 if over(bg2.Position, bg2.Size) then
                     bg2.Color = T().Accent; if fn then fn() end
                     task.delay(0.13, function() pcall(function() bg2.Color = T().Btn end) end)
@@ -425,8 +426,9 @@ function Library:CreateWindow(opts)
         function Obj:AddLabel(txt)
             local lbl = d("Text",{Text=txt,Size=14,Font=FONT,Outline=false,Color=T().Dim,Visible=false,ZIndex=20})
             th(function() lbl.Color=T().Dim end)
+            local isActive = false
             local it = {h=24}
-            function it.setVis(v) lbl.Visible=v end
+            function it.setVis(v) lbl.Visible=v; isActive=v end
             function it.setPos(p) lbl.Position=fv(p+Vector2.new(IP,5)) end
             local Lbl = {}
             function Lbl:SetText(t) lbl.Text=t end
@@ -446,6 +448,7 @@ function Library:CreateWindow(opts)
                 end
                 function it.setVis(v) origV(v); kbBg.Visible=v; kbTxt.Visible=v end
                 on(UserInputService.InputBegan, function(i)
+                    if not isActive or Win.Active ~= parentTab then return end
                     if i.UserInputType==Enum.UserInputType.MouseButton1 and over(kbBg.Position, kbBg.Size) then
                         if activeBind then activeBind.cancel() end
                         listening=true; kbBg.Color=T().Accent; kbTxt.Text="..."
@@ -527,45 +530,44 @@ function Library:CreateWindow(opts)
             end
 
             local function openDD()
-                pcall(function()
-                    if activeDD then activeDD.close(); activeDD=nil end
-                    isOpen=true; dBg.Color=T().Accent; dArr.Text="▴"
-                    local count  = math.min(#vals, MAXDD)
-                    local listH  = count * DD_H + 6
-                    local vp     = pcall(function() return workspace.CurrentCamera.ViewportSize end) and workspace.CurrentCamera.ViewportSize or Vector2.new(1920,1080)
-                    local baseY  = dBg.Position.Y + dBg.Size.Y + 3
-                    if baseY + listH > vp.Y - 10 then baseY = dBg.Position.Y - listH - 3 end
-                    local lx, lw = dBg.Position.X, dW
-                    lBg.Position =fv(Vector2.new(lx,baseY)); lBg.Size =fv(Vector2.new(lw,listH))
-                    lOut.Position=fv(Vector2.new(lx,baseY)); lOut.Size=fv(Vector2.new(lw,listH))
-                    lBg.Visible=true; lOut.Visible=true
-                    for i, row in ipairs(pool) do
-                        local v = vals[i]
-                        if v then
-                            local ry  = baseY + 3 + (i-1)*DD_H
-                            local sel = multi and (type(val)=="table" and val[v]==true) or (val==v)
-                            row.bg.Position=fv(Vector2.new(lx,ry)); row.bg.Size=Vector2.new(lw,DD_H)
-                            row.bg.Color   = sel and T().DropSel or T().DropItem
-                            row.bg.Visible = true
-                            if multi then
-                                local cx,cy = lx+6, ry+(DD_H-10)/2
-                                if sel then
-                                    row.chk.Position=fv(Vector2.new(cx,cy)); row.chk.Visible=true; row.box.Visible=false
-                                else
-                                    row.box.Position=fv(Vector2.new(cx,cy)); row.box.Visible=true; row.chk.Visible=false
-                                end
-                                row.txt.Position = fv(Vector2.new(lx+22, ry+(DD_H-13)/2))
+                if not dBg or not dBg.Position then return end
+                if activeDD then activeDD.close(); activeDD=nil end
+                isOpen=true; pcall(function() dBg.Color=T().Accent end); dArr.Text="▴"
+                local count  = math.min(#vals, MAXDD)
+                local listH  = count * DD_H + 6
+                local vp     = pcall(function() return workspace.CurrentCamera.ViewportSize end) and workspace.CurrentCamera.ViewportSize or Vector2.new(1920,1080)
+                local baseY  = dBg.Position.Y + dBg.Size.Y + 3
+                if baseY + listH > vp.Y - 10 then baseY = dBg.Position.Y - listH - 3 end
+                local lx, lw = dBg.Position.X, dW
+                lBg.Position =fv(Vector2.new(lx,baseY)); lBg.Size =fv(Vector2.new(lw,listH))
+                lOut.Position=fv(Vector2.new(lx,baseY)); lOut.Size=fv(Vector2.new(lw,listH))
+                lBg.Visible=true; lOut.Visible=true
+                for i, row in ipairs(pool) do
+                    local v = vals[i]
+                    if v then
+                        local ry  = baseY + 3 + (i-1)*DD_H
+                        local sel = multi and (type(val)=="table" and val[v]==true) or (val==v)
+                        row.bg.Position=fv(Vector2.new(lx,ry)); row.bg.Size=Vector2.new(lw,DD_H)
+                        row.bg.Color   = sel and T().DropSel or T().DropItem
+                        row.bg.Visible = true
+                        if multi then
+                            local cx,cy = lx+6, ry+(DD_H-10)/2
+                            if sel then
+                                row.chk.Position=fv(Vector2.new(cx,cy)); row.chk.Visible=true; row.box.Visible=false
                             else
-                                row.chk.Visible=false; row.box.Visible=false
-                                row.txt.Position = fv(Vector2.new(lx+10, ry+(DD_H-13)/2))
+                                row.box.Position=fv(Vector2.new(cx,cy)); row.box.Visible=true; row.chk.Visible=false
                             end
-                            row.txt.Text=tostring(v); row.txt.Visible=true
+                            row.txt.Position = fv(Vector2.new(lx+22, ry+(DD_H-13)/2))
                         else
-                            row.bg.Visible=false; row.chk.Visible=false; row.box.Visible=false; row.txt.Visible=false
+                            row.chk.Visible=false; row.box.Visible=false
+                            row.txt.Position = fv(Vector2.new(lx+10, ry+(DD_H-13)/2))
                         end
+                        row.txt.Text=tostring(v); row.txt.Visible=true
+                    else
+                        row.bg.Visible=false; row.chk.Visible=false; row.box.Visible=false; row.txt.Visible=false
                     end
-                    activeDD = {close=closeDD, pos=fv(Vector2.new(lx,baseY)), sz=fv(Vector2.new(lw,listH))}
-                end)
+                end
+                activeDD = {close=closeDD, pos=fv(Vector2.new(lx,baseY)), sz=fv(Vector2.new(lw,listH))}
             end
 
             local it = {h=52}
@@ -584,10 +586,8 @@ function Library:CreateWindow(opts)
             on(UserInputService.InputBegan, function(i)
                 if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
                 if Win.Active ~= parentTab or not isActive then return end
-                -- Debug: ensure we have valid position data
-                if not dBg.Position or not dBg.Size then return end
                 -- Toggle the header button
-                if over(dBg.Position, dBg.Size) then
+                if dBg and dBg.Position and dBg.Size and over(dBg.Position, dBg.Size) then
                     if isOpen then closeDD(); activeDD=nil else openDD() end
                     return
                 end
