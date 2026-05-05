@@ -723,10 +723,13 @@ function Library:CreateWindow(opts)
                     end
                 end
                 
+                -- Set active and layout BEFORE showing
+                Win.Active=Tab; layout()
+                
                 -- Show new tab
             for _,gb in ipairs(Tab.L) do gb.setVis(true) end
             for _,gb in ipairs(Tab.R) do gb.setVis(true) end
-            bLbl.Color=T().TabOn; bInd.Visible=true; layout()
+            bLbl.Color=T().TabOn; bInd.Visible=true
         end
 
         btn.bLbl=bLbl; btn.bInd=bInd
