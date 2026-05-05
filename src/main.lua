@@ -32,8 +32,8 @@ local Window = Library:CreateWindow({ Title = 'BHub Remastered' })
 local ESP = loadFile("src/util/Esp.lua")
 
 local supportedGames = {
+    [9872472334] = "src/games/evade.lua",
     [131756752872026] = "src/games/divedown.lua",
-    [126509999114328] = "src/games/99nights.lua"
 }
 local gamePath = supportedGames[game.PlaceId]
 if gamePath then
@@ -66,7 +66,6 @@ UserInputService.JumpRequest:Connect(function()
     if infJump then pcall(function() plr.Character.Humanoid:ChangeState("Jumping") end) end
 end)
 
--- Optimized Heartbeat: Only sets values if they differ from target
 RunService.Heartbeat:Connect(function()
     local char = plr.Character
     local hum = char and char:FindFirstChild("Humanoid")
