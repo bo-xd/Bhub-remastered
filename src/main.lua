@@ -52,6 +52,8 @@ local Tabs = {
     ['UI Settings'] = Window:AddTab('UI Settings'),
 }
 
+local CommandPalette = Library:CreateCommandPalette({ Title = 'Quick Actions' })
+
 local themeNames = Library:GetThemeNames()
 local themeIndex = 1
 local ThemePicker
@@ -129,6 +131,29 @@ local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
 local AppearanceGroup = Tabs['UI Settings']:AddRightGroupbox('Appearance')
 local uc = false
 
+MenuGroup:AddButton({ Text = 'Save Config', Func = function()
+    if Library:SaveConfig('default') then
+        Library:Notify('Saved default config', 2, { Icon = 'S' })
+    end
+end })
+
+MenuGroup:AddButton({ Text = 'Load Config', Func = function()
+    if Library:LoadConfig('default') then
+        Library:Notify('Loaded default config', 2, { Icon = 'L' })
+    end
+end })
+
+MenuGroup:AddButton({ Text = 'Open Quick Actions', Func = function()
+    CommandPalette:Open({
+        { Text = 'Toggle Window', Callback = function() Window:SetVisible(not Window.Visible) end },
+        { Text = 'Load Config', Callback = function() Library:LoadConfig('default') end },
+        { Text = 'Save Config', Callback = function() Library:SaveConfig('default') end },
+        { Text = 'Previous Theme', Callback = function() applyThemeByIndex(-1) end },
+        { Text = 'Next Theme', Callback = function() applyThemeByIndex(1) end },
+        { Text = 'Unload UI', Callback = function() Library:Unload() end },
+    })
+end })
+
 ThemePicker = AppearanceGroup:AddDropdown('UiTheme', {
     Text = 'Theme',
     Values = themeNames,
@@ -146,6 +171,13 @@ ThemePicker = AppearanceGroup:AddDropdown('UiTheme', {
 
 AppearanceGroup:AddButton({ Text = 'Previous Theme', Func = function() applyThemeByIndex(-1) end })
 AppearanceGroup:AddButton({ Text = 'Next Theme', Func = function() applyThemeByIndex(1) end })
+AppearanceGroup:AddToggle('ShadowEnabled', { Text = 'Window Shadow', Default = true, Callback = function(v) Window:SetShadowEnabled(v) end })
+AppearanceGroup:AddSlider('ShadowAlpha', { Text = 'Shadow Alpha', Min = 0, Max = 1, Default = 0.35, Rounding = 2, Callback = function(v) Window:SetShadowTransparency(v) end })
+AppearanceGroup:AddToggle('AccentOverride', { Text = 'Accent Override', Default = true, Callback = function(v) if not v then Library:ClearAccentColor() end end }):AddColorPicker('AccentColor', {
+    Default = Library.Themes[Library.CurrentThemeName].Accent,
+    Title = 'Accent Color',
+    Callback = function(v) Library:SetAccentColor(v) end,
+})
 
 MenuGroup:AddButton({ Text = 'Unload', Func = function()
     if uc then
@@ -162,10 +194,14 @@ UserInputService.InputBegan:Connect(function(inp, gp)
     if gp then return end
     if inp.KeyCode == Enum.KeyCode.Delete then
         Window:SetVisible(not Window.Visible)
-    elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and inp.KeyCode == Enum.KeyCode.O then
-        applyThemeByIndex(-1)
-    elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and inp.KeyCode == Enum.KeyCode.P then
-        applyThemeByIndex(1)
+    elseif inp.KeyCode == Enum.KeyCode.K and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+        CommandPalette:Open({
+            { Text = 'Toggle Window', Callback = function() Window:SetVisible(not Window.Visible) end },
+            { Text = 'Save Config', Callback = function() Library:SaveConfig('default') end },
+            { Text = 'Load Config', Callback = function() Library:LoadConfig('default') end },
+            { Text = 'Previous Theme', Callback = function() applyThemeByIndex(-1) end },
+            { Text = 'Next Theme', Callback = function() applyThemeByIndex(1) end },
+        })
     end
 end)
 

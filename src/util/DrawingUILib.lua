@@ -110,10 +110,19 @@ Library.Themes = {
     },
 }
 
+Library.AccentOverride = nil
+
 local baseTransMap = {}
 local notifyList = {}
 
-local function T()   return Library.Themes[Library.CurrentThemeName] end
+local function T()
+    local theme = Library.Themes[Library.CurrentThemeName]
+    if not theme then return Library.Themes.Default end
+    if Library.AccentOverride then
+        return setmetatable({ Accent = Library.AccentOverride }, { __index = theme })
+    end
+    return theme
+end
 local function th(f) table.insert(Library.ThemeUpdaters, f) end
 
 local function d(class, props)
@@ -229,6 +238,149 @@ function Library:CreateLoader(opts)
     return loader
 end
 
+function Library:CreateCommandPalette(opts)
+    opts = opts or {}
+    local title = opts.Title or "Command Palette"
+    local camera = workspace.CurrentCamera or workspace:FindFirstChildOfClass("Camera")
+    local vp = camera and camera.ViewportSize or Vector2.new(1920, 1080)
+    local panelW = math.clamp(opts.Width or 420, 340, 540)
+    local panelH = 220
+    local pos = Vector2.new(math.floor((vp.X - panelW) / 2), math.floor((vp.Y - panelH) / 2))
+
+    local dim = d("Square", {Filled=true, Color=Color3.new(0, 0, 0), Transparency=0.45, Visible=false, ZIndex=210, Size=vp, Position=Vector2.new(0, 0)})
+    local panel = d("Square", {Filled=true, Color=T().Bg, Visible=false, ZIndex=211, Rounding=8, Size=Vector2.new(panelW, panelH), Position=pos})
+    local border = d("Square", {Filled=false, Color=T().GroupBorder, Visible=false, ZIndex=211, Rounding=8, Thickness=1, Size=Vector2.new(panelW, panelH), Position=pos})
+    local accent = d("Square", {Filled=true, Color=T().Accent, Visible=false, ZIndex=212, Size=Vector2.new(panelW, 2), Position=pos})
+    local titleText = d("Text", {Text=title, Size=16, Font=FONT, Outline=false, Color=T().Text, Visible=false, ZIndex=213, Position=pos + Vector2.new(16, 12)})
+    local queryText = d("Text", {Text="", Size=13, Font=FONT, Outline=false, Color=T().Dim, Visible=false, ZIndex=213, Position=pos + Vector2.new(16, 36)})
+    local listBg = d("Square", {Filled=true, Color=T().GroupBg, Visible=false, ZIndex=212, Rounding=5, Size=Vector2.new(panelW - 32, 140), Position=pos + Vector2.new(16, 64)})
+
+    local rows = {}
+    for i = 1, 6 do
+        rows[i] = {
+            bg = d("Square", {Filled=true, Color=T().DropItem, Visible=false, ZIndex=213, Size=Vector2.new(panelW - 40, 20), Position=pos}),
+            txt = d("Text", {Text="", Size=13, Font=FONT, Outline=false, Color=T().Text, Visible=false, ZIndex=214, Position=pos}),
+        }
+    end
+
+    local palette = {visible=false, items={}, filtered={}, query="", selected=1}
+    local keyConn
+
+    local function refreshRows()
+        palette.filtered = {}
+        local q = string.lower(palette.query)
+        for _, item in ipairs(palette.items) do
+            local text = string.lower(item.Text or "")
+            if q == "" or text:find(q, 1, true) then
+                palette.filtered[#palette.filtered + 1] = item
+            end
+        end
+        if #palette.filtered == 0 then
+            palette.selected = 0
+        else
+            palette.selected = math.clamp(palette.selected, 1, #palette.filtered)
+        end
+        queryText.Text = palette.query == "" and "Type to search" or ("Search: " .. palette.query)
+        for i = 1, 6 do
+            local item = palette.filtered[i]
+            if item then
+                local y = pos.Y + 70 + (i - 1) * 24
+                rows[i].bg.Position = Vector2.new(pos.X + 16, y)
+                rows[i].bg.Size = Vector2.new(panelW - 32, 20)
+                rows[i].bg.Color = (palette.selected == i) and T().DropSel or T().DropItem
+                rows[i].bg.Visible = true
+                rows[i].txt.Position = Vector2.new(pos.X + 24, y + 3)
+                rows[i].txt.Text = item.Text or ""
+                rows[i].txt.Visible = true
+            else
+                rows[i].bg.Visible = false
+                rows[i].txt.Visible = false
+            end
+        end
+    end
+
+    local function closePalette()
+        if not palette.visible then return end
+        palette.visible = false
+        if keyConn then keyConn:Disconnect(); keyConn = nil end
+        for _, obj in ipairs({dim, panel, border, accent, titleText, queryText, listBg}) do pcall(function() obj.Visible = false end) end
+        for _, row in ipairs(rows) do pcall(function() row.bg.Visible = false; row.txt.Visible = false end) end
+    end
+
+    local function runSelected()
+        local item = palette.filtered[palette.selected]
+        if item and item.Callback then
+            pcall(item.Callback)
+        end
+        closePalette()
+    end
+
+    local function charFromKey(keyCode)
+        local name = tostring(keyCode):gsub("Enum%.KeyCode%.", "")
+        if #name == 1 then return string.lower(name) end
+        if name == "Space" then return " " end
+        if name:match("^%d$") then return name end
+        return nil
+    end
+
+    local paletteApi = {}
+
+    function paletteApi:Open(items)
+        palette.items = items or {}
+        palette.query = ""
+        palette.selected = 1
+        palette.visible = true
+        for _, obj in ipairs({dim, panel, border, accent, titleText, queryText, listBg}) do pcall(function() obj.Visible = true end) end
+        refreshRows()
+        if keyConn then keyConn:Disconnect() end
+        keyConn = UserInputService.InputBegan:Connect(function(input, gp)
+            if gp or not palette.visible then return end
+            if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+            if input.KeyCode == Enum.KeyCode.Escape then
+                closePalette()
+                return
+            elseif input.KeyCode == Enum.KeyCode.Return then
+                runSelected()
+                return
+            elseif input.KeyCode == Enum.KeyCode.Up then
+                if #palette.filtered > 0 then
+                    palette.selected = math.max(1, palette.selected - 1)
+                    refreshRows()
+                end
+                return
+            elseif input.KeyCode == Enum.KeyCode.Down then
+                if #palette.filtered > 0 then
+                    palette.selected = math.min(#palette.filtered, palette.selected + 1)
+                    refreshRows()
+                end
+                return
+            elseif input.KeyCode == Enum.KeyCode.Backspace then
+                palette.query = palette.query:sub(1, math.max(#palette.query - 1, 0))
+                palette.selected = 1
+                refreshRows()
+                return
+            end
+
+            local char = charFromKey(input.KeyCode)
+            if char then
+                palette.query = palette.query .. char
+                palette.selected = 1
+                refreshRows()
+            end
+        end)
+    end
+
+    function paletteApi:Close()
+        closePalette()
+    end
+
+    function paletteApi:IsOpen()
+        return palette.visible
+    end
+
+    return paletteApi
+end
+
 on(RunService.RenderStepped, function(dt)
     local vp = workspace.CurrentCamera.ViewportSize
     local currentY = vp.Y - 20 
@@ -248,13 +400,15 @@ on(RunService.RenderStepped, function(dt)
             notif.objs.bg.Position = Vector2.new(x, y)
             notif.objs.out.Position = Vector2.new(x, y)
             notif.objs.acc.Position = Vector2.new(x, y)
-            notif.objs.txt.Position = Vector2.new(x + 12, y + (notif.h - notif.objs.txt.TextBounds.Y)/2)
+            notif.objs.ico.Position = Vector2.new(x + 12, y + (notif.h - notif.objs.ico.TextBounds.Y)/2)
+            notif.objs.txt.Position = Vector2.new(x + 28, y + (notif.h - notif.objs.txt.TextBounds.Y)/2)
             notif.objs.bar.Position = Vector2.new(x + 3, y + notif.h - 3)
             notif.objs.bar.Size = Vector2.new(math.max((notif.w - 6) * progress, 0), 2)
             
             notif.objs.bg.Color = T().GroupBg
             notif.objs.out.Color = T().GroupBorder
             notif.objs.acc.Color = T().Accent
+            notif.objs.ico.Color = T().Accent
             notif.objs.txt.Color = T().Text
             notif.objs.bar.Color = T().Accent
         end)
@@ -266,12 +420,12 @@ on(RunService.RenderStepped, function(dt)
                     local a = 1 - (j/10)
                     pcall(function()
                         notif.objs.bg.Transparency = a; notif.objs.out.Transparency = a
-                        notif.objs.acc.Transparency = a; notif.objs.txt.Transparency = a; notif.objs.bar.Transparency = a
+                        notif.objs.acc.Transparency = a; notif.objs.txt.Transparency = a; notif.objs.bar.Transparency = a; notif.objs.ico.Transparency = a
                     end)
                     task.wait(0.015)
                 end
                 removeDrawing(notif.objs.bg); removeDrawing(notif.objs.out)
-                removeDrawing(notif.objs.acc); removeDrawing(notif.objs.txt); removeDrawing(notif.objs.bar)
+                removeDrawing(notif.objs.acc); removeDrawing(notif.objs.txt); removeDrawing(notif.objs.bar); removeDrawing(notif.objs.ico)
             end)
         end
     end
@@ -283,12 +437,14 @@ on(RunService.RenderStepped, function(dt)
     end
 end)
 
-function Library:Notify(text, duration)
+function Library:Notify(text, duration, opts)
     duration = duration or 3
+    opts = opts or {}
     
     local txt = d("Text", {Text=text, Size=14, Font=FONT, Outline=false, Color=T().Text, Visible=true, ZIndex=102})
+    local ico = d("Text", {Text=opts.Icon or "•", Size=14, Font=FONT, Outline=false, Color=T().Accent, Visible=true, ZIndex=102})
     local bounds = txt.TextBounds
-    local w = math.max(bounds.X + 34, 150)
+    local w = math.max(bounds.X + 48, 160)
     local h = 30
     
     local bg = d("Square", {Filled=true, ZIndex=100, Rounding=4, Color=T().GroupBg, Visible=true})
@@ -296,8 +452,8 @@ function Library:Notify(text, duration)
     local acc = d("Square", {Filled=true, ZIndex=101, Rounding=0, Color=T().Accent, Visible=true})
     local bar = d("Square", {Filled=true, ZIndex=101, Rounding=0, Color=T().Accent, Visible=true})
     
-    baseTransMap[bg] = 1; baseTransMap[out] = 1; baseTransMap[acc] = 1; baseTransMap[txt] = 1; baseTransMap[bar] = 1
-    bg.Transparency = 0; out.Transparency = 0; acc.Transparency = 0; txt.Transparency = 0; bar.Transparency = 0
+    baseTransMap[bg] = 1; baseTransMap[out] = 1; baseTransMap[acc] = 1; baseTransMap[txt] = 1; baseTransMap[bar] = 1; baseTransMap[ico] = 1
+    bg.Transparency = 0; out.Transparency = 0; acc.Transparency = 0; txt.Transparency = 0; bar.Transparency = 0; ico.Transparency = 0
     
     local vp = workspace.CurrentCamera.ViewportSize
     local startY = vp.Y + h 
@@ -307,7 +463,7 @@ function Library:Notify(text, duration)
     local notif = {
         targetY = startY, currentY = startY, createdAt = tick(),
         duration = duration, fadingOut = false, w = w, h = h,
-        objs = {bg=bg, out=out, acc=acc, txt=txt, bar=bar}
+        objs = {bg=bg, out=out, acc=acc, txt=txt, bar=bar, ico=ico}
     }
     
     table.insert(notifyList, notif)
@@ -324,6 +480,16 @@ end
 function Library:SetTheme(name)
     if not Library.Themes[name] then return end
     Library.CurrentThemeName = name
+    for _,fn in ipairs(Library.ThemeUpdaters) do pcall(fn) end
+end
+
+function Library:SetAccentColor(color)
+    Library.AccentOverride = color
+    for _,fn in ipairs(Library.ThemeUpdaters) do pcall(fn) end
+end
+
+function Library:ClearAccentColor()
+    Library.AccentOverride = nil
     for _,fn in ipairs(Library.ThemeUpdaters) do pcall(fn) end
 end
 
@@ -608,6 +774,19 @@ function Library:CreateWindow(opts)
             layout()
         end
 
+        local colorPresets = {
+            Color3.fromRGB(255, 255, 255),
+            Color3.fromRGB(255, 80, 80),
+            Color3.fromRGB(255, 170, 60),
+            Color3.fromRGB(255, 220, 60),
+            Color3.fromRGB(80, 220, 120),
+            Color3.fromRGB(80, 180, 255),
+            Color3.fromRGB(170, 100, 255),
+            Color3.fromRGB(255, 90, 180),
+            Color3.fromRGB(0, 255, 209),
+            Color3.fromRGB(255, 120, 72),
+        }
+
         local Obj = {}
 
         function Obj:AddToggle(id, o)
@@ -639,7 +818,47 @@ function Library:CreateWindow(opts)
                     if o.Callback then o.Callback(st) end
                 end
             end)
-            function Tog:AddColorPicker() return {OnChanged=function()end} end
+            function Tog:AddColorPicker(id, co)
+                co = co or {}
+                local pickerColor = co.Default or Color3.new(1, 1, 1)
+                local colorIndex = 1
+                for i, c in ipairs(colorPresets) do
+                    if c == pickerColor then
+                        colorIndex = i
+                        break
+                    end
+                end
+                local swatch = d("Square", {Size=Vector2.new(16, 16), Filled=true, ZIndex=22, Rounding=4, Color=pickerColor, Visible=false})
+                local border = d("Square", {Size=Vector2.new(16, 16), Filled=false, ZIndex=23, Rounding=4, Thickness=1, Color=T().GroupBorder, Visible=false})
+                local it2 = {h=28}
+                function it2.setVis(v) swatch.Visible=v; border.Visible=v end
+                function it2.setPos(p)
+                    swatch.Position = fv(p + Vector2.new(COL - 24, 6))
+                    border.Position = fv(p + Vector2.new(COL - 24, 6))
+                end
+                local function applyColor(c)
+                    pickerColor = c
+                    swatch.Color = c
+                    if co.Callback then co.Callback(c) end
+                end
+                on(UserInputService.InputBegan, function(i)
+                    if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+                    if Win.Active ~= parentTab or not isActive then return end
+                    if over(swatch.Position, swatch.Size) then
+                        colorIndex = (colorIndex % #colorPresets) + 1
+                        applyColor(colorPresets[colorIndex])
+                    end
+                end)
+                Library:_regCfg(id or (txt .. "Color"), function() return pickerColor end, function(v)
+                    if typeof(v) == "Color3" then
+                        applyColor(v)
+                    end
+                end)
+                th(function() border.Color = T().GroupBorder end)
+                addIt(it2)
+                if co.Callback then task.spawn(co.Callback, pickerColor) end
+                return { Value = pickerColor, SetValue = applyColor, OnChanged = function() end }
+            end
             function Tog:AddKeyPicker()   return {OnChanged=function()end} end
             Library:_regCfg(id, function() return st end, function(v)
                 st=v; Tog.State=v; refresh(); if o.Callback then o.Callback(v) end
@@ -785,6 +1004,8 @@ function Library:CreateWindow(opts)
             local iP    = Vector2.new()
             local isOpen = false
             local isActive = false
+            local searchQuery = ""
+            local filteredVals = vals
             local ddBtnRef = {
                 pos=nil, sz=nil, active=function() return isActive and Win.Active == parentTab end,
             }
@@ -798,6 +1019,9 @@ function Library:CreateWindow(opts)
             th(function() lbl.Color=T().Text; dBg.Color=isOpen and T().Accent or T().Btn; dVal.Color=T().Text; dArr.Color=T().Dim end)
 
             local function display()
+                if isOpen and searchQuery ~= "" then
+                    return "Search: " .. searchQuery
+                end
                 if multi then
                     local p={}; for k,v in pairs(val or {}) do if v then table.insert(p,tostring(k)) end end
                     table.sort(p)
@@ -808,6 +1032,18 @@ function Library:CreateWindow(opts)
                 return #s>22 and s:sub(1,20).."…" or s
             end
             dVal.Text = display()
+
+            local function rebuildFiltered()
+                filteredVals = {}
+                local q = string.lower(searchQuery)
+                for _, item in ipairs(vals) do
+                    local text = string.lower(tostring(item))
+                    if q == "" or text:find(q, 1, true) then
+                        filteredVals[#filteredVals + 1] = item
+                    end
+                end
+                dVal.Text = display()
+            end
 
             local pool = {}
             for _=1,MAXDD do
@@ -826,6 +1062,7 @@ function Library:CreateWindow(opts)
 
             local function closeDD()
                 isOpen=false; dBg.Color=T().Btn; dArr.Text="▾"
+                searchQuery = ""
                 lBg.Visible=false; lOut.Visible=false
                 for _,row in ipairs(pool) do
                     row.bg.Visible=false; row.chk.Visible=false; row.box.Visible=false; row.txt.Visible=false
@@ -837,7 +1074,8 @@ function Library:CreateWindow(opts)
                 if not dBg or not dBg.Position or dBg.Position == Vector2.new(0,0) then return end
                 if activeDD then activeDD.close(); activeDD=nil end
                 isOpen=true; pcall(function() dBg.Color=T().Accent end); dArr.Text="▴"
-                local count  = math.min(#vals, MAXDD)
+                rebuildFiltered()
+                local count  = math.min(#filteredVals, MAXDD)
                 local scrollIndex = 1
                 if count == 0 then return end  
                 local listH  = count * DD_H + 6
@@ -850,7 +1088,7 @@ function Library:CreateWindow(opts)
                 lBg.Visible=true; lOut.Visible=true
                 for i=1, count do
                     local row = pool[i]
-                    local v = vals[i]
+                    local v = filteredVals[i]
                     if v then
                         local ry  = baseY + 3 + (i-1)*DD_H
                         local sel = multi and (type(val)=="table" and val[v]==true) or (val==v)
@@ -905,13 +1143,13 @@ function Library:CreateWindow(opts)
                     local scrollIdx = activeDD and activeDD.scroll and activeDD.scroll.index or 1
                     for idx, row in ipairs(pool) do
                         local actualIdx = scrollIdx + idx - 1
-                        if vals[actualIdx] and over(row.bg.Position, row.bg.Size) then
-                            local v = vals[actualIdx]
+                        local v = filteredVals[actualIdx]
+                        if v and over(row.bg.Position, row.bg.Size) then
                             if multi then
                                 if type(val) ~= "table" then val={} end
                                 if val[v] then val[v]=nil else val[v]=true end
                                 dVal.Text = display()
-                                openDD() 
+                                openDD()
                             else
                                 val=v; dVal.Text=display(); closeDD(); activeDD=nil
                             end
@@ -922,12 +1160,49 @@ function Library:CreateWindow(opts)
                 end
             end)
 
+            on(UserInputService.InputBegan, function(i)
+                if not isOpen or Win.Active ~= parentTab or not isActive then return end
+                if i.UserInputType ~= Enum.UserInputType.Keyboard then return end
+                local keyNameStr = tostring(i.KeyCode):gsub("Enum%.KeyCode%.", "")
+                if keyNameStr == "Backspace" then
+                    searchQuery = searchQuery:sub(1, math.max(#searchQuery - 1, 0))
+                    rebuildFiltered(); openDD(); return
+                elseif keyNameStr == "Space" then
+                    searchQuery = searchQuery .. " "
+                    rebuildFiltered(); openDD(); return
+                elseif keyNameStr == "Escape" then
+                    closeDD(); activeDD=nil; return
+                elseif keyNameStr == "Return" then
+                    if #filteredVals > 0 then
+                        local v = filteredVals[math.clamp(activeDD and activeDD.scroll and activeDD.scroll.index or 1, 1, #filteredVals)]
+                        if v then
+                            if multi then
+                                if type(val) ~= "table" then val={} end
+                                if val[v] then val[v]=nil else val[v]=true end
+                                dVal.Text = display()
+                                openDD()
+                            else
+                                val=v; dVal.Text=display(); closeDD(); activeDD=nil
+                            end
+                            if o.Callback then o.Callback(val) end
+                        end
+                    end
+                    return
+                else
+                    local ch = keyNameStr:match("^[A-Z]$") or keyNameStr:match("^%d$")
+                    if ch then
+                        searchQuery = searchQuery .. string.lower(ch)
+                        rebuildFiltered(); openDD(); return
+                    end
+                end
+            end)
+
             on(RunService.RenderStepped, function()
                 if not isOpen then return end
                 local scrollIdx = activeDD and activeDD.scroll and activeDD.scroll.index or 1
                 for idx, row in ipairs(pool) do
                     local actualIdx = scrollIdx + idx - 1
-                    local v = vals[actualIdx]
+                    local v = filteredVals[actualIdx]
                     if v and row.bg.Visible then
                         local sel = multi and (type(val)=="table" and val[v]==true) or (val==v)
                         row.bg.Color = over(row.bg.Position, row.bg.Size) and T().DropHover or (sel and T().DropSel or T().DropItem)
@@ -949,14 +1224,14 @@ function Library:CreateWindow(opts)
                     if i.Position.Z > 0 then delta = -1 elseif i.Position.Z < 0 then delta = 1 end
                 end
                 if delta == 0 then return end
-                local maxStart = math.max(1, #vals - s.visible + 1)
+                local maxStart = math.max(1, #filteredVals - s.visible + 1)
                 s.index = math.clamp(s.index + delta, 1, maxStart)
                 local lx, lw = dBg.Position.X, dBg.Size.X
                 local baseY = activeDD.pos.Y
                 for i=1, s.visible do
                     local row = pool[i]
                     local actual = s.index + i - 1
-                    local v = vals[actual]
+                    local v = filteredVals[actual]
                     if v then
                         local ry = baseY + 3 + (i-1)*DD_H
                         row.bg.Position = fv(Vector2.new(lx, ry)); row.bg.Size = Vector2.new(lw, DD_H)
