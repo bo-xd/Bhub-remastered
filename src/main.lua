@@ -29,11 +29,8 @@ end
 
 local Library = loadFile("src/util/DrawingUILib.lua")
 local Window = Library:CreateWindow({ Title = 'BHub Remastered' })
-
-
 local ESP = loadFile("src/util/Esp.lua")
 
--- Load game-specific module
 local supportedGames = {
     [131756752872026] = "src/games/divedown.lua",
     [126509999114328] = "src/games/99nights.lua"
@@ -43,15 +40,12 @@ if gamePath then
     local gameScript = loadFile(gamePath)
     if gameScript then task.spawn(function() gameScript(Window, ESP, Library) end) end
 end
-task.wait(0.2)
 
--- Tabs
 local Tabs = {
     Universal = Window:AddTab('Universal'),
     ['UI Settings'] = Window:AddTab('UI Settings'),
 }
 
--- ESP
 local EspGroup = Tabs.Universal:AddLeftGroupbox('Universal ESP')
 EspGroup:AddToggle('EspEnable',   { Text = 'Enable ESP',      Default = false, Callback = function(v) ESP.Enabled     = v end })
 EspGroup:AddToggle('EspBoxes',    { Text = 'Show Boxes',      Default = true,  Callback = function(v) ESP.ShowBoxes   = v end }):AddColorPicker('BoxColor',  { Default = Color3.new(1,1,1), Title = 'Box Color',  Callback = function(v) ESP.BoxColor  = v end })
@@ -60,37 +54,29 @@ EspGroup:AddToggle('EspDistance', { Text = 'Show Distance',   Default = true,  C
 EspGroup:AddToggle('EspHealth',   { Text = 'Show Health Bar', Default = true,  Callback = function(v) ESP.ShowHealth  = v end })
 EspGroup:AddToggle('EspTracers',  { Text = 'Show Tracers',    Default = false, Callback = function(v) ESP.ShowTracers = v end })
 
--- Character
 local CharGroup = Tabs.Universal:AddRightGroupbox('Character')
 local wsVal, jpVal = 16, 50
 CharGroup:AddSlider('WalkSpeed', { Text = 'WalkSpeed', Min = 16, Max = 250, Default = 16, Rounding = 0, Callback = function(v) wsVal = v end })
 CharGroup:AddSlider('JumpPower', { Text = 'JumpPower', Min = 50, Max = 500, Default = 50, Rounding = 0, Callback = function(v) jpVal = v end })
 
-local infJump, noclip = false, false
+local infJump = false
 CharGroup:AddToggle('InfJump', { Text = 'Infinite Jump', Default = false, Callback = function(v) infJump = v end })
-CharGroup:AddToggle('Noclip',  { Text = 'Noclip',        Default = false, Callback = function(v) noclip  = v end })
 
-game:GetService("UserInputService").JumpRequest:Connect(function()
+UserInputService.JumpRequest:Connect(function()
     if infJump then pcall(function() plr.Character.Humanoid:ChangeState("Jumping") end) end
 end)
 
-RunService.Stepped:Connect(function()
+-- Optimized Heartbeat: Only sets values if they differ from target
+RunService.Heartbeat:Connect(function()
     local char = plr.Character
-    if not char then return end
-    local hum = char:FindFirstChild("Humanoid")
+    local hum = char and char:FindFirstChild("Humanoid")
     if hum then
-        hum.WalkSpeed     = wsVal
-        hum.JumpPower     = jpVal
-        hum.UseJumpPower  = true
-    end
-    if noclip then
-        for _, p in pairs(char:GetDescendants()) do
-            if p:IsA("BasePart") then p.CanCollide = false end
-        end
+        if hum.WalkSpeed ~= wsVal then hum.WalkSpeed = wsVal end
+        if hum.JumpPower ~= jpVal then hum.JumpPower = jpVal end
+        hum.UseJumpPower = true
     end
 end)
 
--- Player ESP
 local function setupPlayer(p)
     local function add(char)
         task.delay(0.5, function()
@@ -113,7 +99,6 @@ for _, p in pairs(plrs:GetPlayers()) do if p ~= plr then setupPlayer(p) end end
 plrs.PlayerAdded:Connect(setupPlayer)
 plrs.PlayerRemoving:Connect(function(p) if p.Character then ESP:Remove(p.Character) end end)
 
--- UI Settings
 local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
 local AppearanceGroup = Tabs['UI Settings']:AddRightGroupbox('Appearance')
 local uc = false
@@ -127,37 +112,10 @@ MenuGroup:AddButton({ Text = 'Unload', Func = function()
         task.delay(3, function() uc = false end)
     end
 end })
-MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'Delete', NoUI = true, Text = 'Menu keybind' })
 
-AppearanceGroup:AddDropdown('ThemeSelect', {
-    Text = 'Theme',
-    Values = {'Default', 'Dark', 'Midnight', 'Forest'},
-    Default = Library.CurrentThemeName,
-    Multi = false,
-    Callback = function(v)
-        if v and Library.Themes[v] then
-            Library:SetTheme(v)
-        end
-    end
-})
-
--- Allow toggling the window backdrop shadow
-AppearanceGroup:AddToggle('WindowShadow', { Text = 'Window Shadow', Default = true, Callback = function(v)
-    if Window and Window.SetShadowEnabled then Window:SetShadowEnabled(v) end
-end })
-
-AppearanceGroup:AddSlider('WindowShadowAlpha', { Text = 'Shadow Alpha', Min = 0, Max = 0.9, Default = 0.35, Rounding = 2, Callback = function(v)
-    if Window and Window.SetShadowTransparency then Window:SetShadowTransparency(v) end
-end })
-
--- Simple menu toggle - check for Delete key (default keybind)
 UserInputService.InputBegan:Connect(function(inp, gp)
     if gp then return end
-    if inp.UserInputType == Enum.UserInputType.Keyboard then
-        if inp.KeyCode == Enum.KeyCode.Delete then
-            Window:SetVisible(not Window.Visible)
-        end
+    if inp.KeyCode == Enum.KeyCode.Delete then
+        Window:SetVisible(not Window.Visible)
     end
 end)
-
-
