@@ -33,7 +33,6 @@ local function hideAll(components)
 end
 
 function ESP:Add(object, options)
-    -- Prevent duplicate tracking for the same object[cite: 1]
     if self.Objects[object] then self:Remove(object) end
 
     local primaryPart =
@@ -46,7 +45,6 @@ function ESP:Add(object, options)
     local color = (options and options.Color) or self.BoxColor
     local name  = (options and options.Name)  or object.Name
 
-    -- Initialize drawing objects[cite: 1]
     local c = {
         BoxOut  = newDrawing("Square", { Thickness=3, Color=Color3.new(0,0,0), Transparency=1, Filled=false, Visible=false }),
         Box     = newDrawing("Square", { Thickness=1, Color=color, Transparency=1, Filled=false, Visible=false }),
@@ -71,8 +69,7 @@ end
 function ESP:Remove(object)
     local data = self.Objects[object]
     if not data then return end
-    
-    -- Properly remove drawings from memory[cite: 1]
+
     for _, c in pairs(data.Components) do
         c.Visible = false
         c:Remove()
@@ -94,8 +91,6 @@ function ESP:Update()
     local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
 
     for obj, data in pairs(self.Objects) do
-        -- CRITICAL PERFORMANCE FIX: 
-        -- If the object is deleted or removed from workspace, kill its ESP immediately[cite: 1]
         if not obj or not obj.Parent or not data.PrimaryPart or not data.PrimaryPart.Parent then
             self:Remove(obj)
             continue
@@ -105,13 +100,11 @@ function ESP:Update()
         local globalOk = data.IsEnabled ~= nil or self.Enabled
         local c = data.Components
 
-        -- Check if custom enabled callback or global flag is false
         if not globalOk or (data.IsEnabled and not data.IsEnabled()) then
             hideAll(c)
             continue
         end
 
-        -- Distance Cull: Stop processing if too far away[cite: 1]
         local rootPos = part.Position
         local dist    = localRoot and (localRoot.Position - rootPos).Magnitude or 0
         if dist > self.MaxDistance then
@@ -119,7 +112,6 @@ function ESP:Update()
             continue
         end
 
-        -- Screen position check
         local topVP, onTop       = cam:WorldToViewportPoint(rootPos + Vector3.new(0, 3, 0))
         local bottomVP, onBottom = cam:WorldToViewportPoint(rootPos - Vector3.new(0, 3, 0))
 
@@ -150,7 +142,6 @@ function ESP:Update()
                 c.Dist.Position = Vector2.new(topVP.X, y + self.TextSize + 2)
             end
         else
-            -- Box Logic
             local showBox = self.ShowBoxes
             c.BoxOut.Visible = showBox
             c.Box.Visible    = showBox
@@ -162,7 +153,6 @@ function ESP:Update()
                 c.Box.Color       = color
             end
 
-            -- Health Logic[cite: 1]
             local hum = obj:FindFirstChildWhichIsA("Humanoid")
             local showHp = self.ShowHealth and hum ~= nil
             c.HpOut.Visible = showHp
@@ -177,7 +167,6 @@ function ESP:Update()
                 c.Hp.Color       = Color3.fromHSV(pct * 0.33, 1, 1)
             end
 
-            -- Name Logic
             c.Name.Visible = self.ShowNames
             if c.Name.Visible then
                 c.Name.Text     = data.Name
@@ -185,7 +174,6 @@ function ESP:Update()
                 c.Name.Position = Vector2.new(x + width * 0.5, y - self.TextSize - 2)
             end
 
-            -- Distance Logic
             c.Dist.Visible = self.ShowDistance and localRoot ~= nil
             if c.Dist.Visible then
                 c.Dist.Text     = string.format("[%d]", math.floor(dist))
@@ -194,7 +182,6 @@ function ESP:Update()
             end
         end
 
-        -- Tracer Logic
         if self.ShowTracers then
             local center = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
             c.Tracer.Visible = true

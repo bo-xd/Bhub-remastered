@@ -46,6 +46,27 @@ local Tabs = {
     ['UI Settings'] = Window:AddTab('UI Settings'),
 }
 
+local themeNames = Library:GetThemeNames()
+local themeIndex = 1
+local ThemePicker
+for i, name in ipairs(themeNames) do
+    if name == Library.CurrentThemeName then
+        themeIndex = i
+        break
+    end
+end
+
+local function applyThemeByIndex(delta)
+    if #themeNames == 0 then return end
+    themeIndex = ((themeIndex - 1 + delta) % #themeNames) + 1
+    local themeName = themeNames[themeIndex]
+    Library:SetTheme(themeName)
+    if ThemePicker and ThemePicker.SetValue then
+        ThemePicker:SetValue(themeName)
+    end
+    Library:Notify('Theme: ' .. themeName, 2)
+end
+
 local EspGroup = Tabs.Universal:AddLeftGroupbox('Universal ESP')
 EspGroup:AddToggle('EspEnable',   { Text = 'Enable ESP',      Default = false, Callback = function(v) ESP.Enabled     = v end })
 EspGroup:AddToggle('EspBoxes',    { Text = 'Show Boxes',      Default = true,  Callback = function(v) ESP.ShowBoxes   = v end }):AddColorPicker('BoxColor',  { Default = Color3.new(1,1,1), Title = 'Box Color',  Callback = function(v) ESP.BoxColor  = v end })
@@ -101,6 +122,25 @@ plrs.PlayerRemoving:Connect(function(p) if p.Character then ESP:Remove(p.Charact
 local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
 local AppearanceGroup = Tabs['UI Settings']:AddRightGroupbox('Appearance')
 local uc = false
+
+ThemePicker = AppearanceGroup:AddDropdown('UiTheme', {
+    Text = 'Theme',
+    Values = themeNames,
+    Default = Library.CurrentThemeName,
+    Callback = function(v)
+        Library:SetTheme(v)
+        for i, name in ipairs(themeNames) do
+            if name == v then
+                themeIndex = i
+                break
+            end
+        end
+    end,
+})
+
+AppearanceGroup:AddButton({ Text = 'Previous Theme', Func = function() applyThemeByIndex(-1) end })
+AppearanceGroup:AddButton({ Text = 'Next Theme', Func = function() applyThemeByIndex(1) end })
+
 MenuGroup:AddButton({ Text = 'Unload', Func = function()
     if uc then
         ESP:Unload()
@@ -116,5 +156,9 @@ UserInputService.InputBegan:Connect(function(inp, gp)
     if gp then return end
     if inp.KeyCode == Enum.KeyCode.Delete then
         Window:SetVisible(not Window.Visible)
+    elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and inp.KeyCode == Enum.KeyCode.P then
+        applyThemeByIndex(1)
+    elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and inp.KeyCode == Enum.KeyCode.Tab then
+        applyThemeByIndex(-1)
     end
 end)

@@ -9,9 +9,8 @@ Library.ThemeUpdaters = {}
 Library.ConfigData    = {}
 Library.CurrentThemeName = "Default"
 
-local FONT = 0  -- Drawing.Fonts.UI — anti-aliased Gotham/sans-serif
+local FONT = 0
 
--- ── Themes ────────────────────────────────────────────────────────────────────
 Library.Themes = {
     Default = {
         Bg=Color3.fromRGB(14,14,21),      Bar=Color3.fromRGB(20,20,32),
@@ -24,6 +23,54 @@ Library.Themes = {
         Sep=Color3.fromRGB(32,32,50),     SlidBg=Color3.fromRGB(26,26,42),
         DropBg=Color3.fromRGB(18,18,28),  DropItem=Color3.fromRGB(26,26,40),
         DropHover=Color3.fromRGB(42,42,65),DropSel=Color3.fromRGB(72,44,200),
+    },
+    Neon = {
+        Bg=Color3.fromRGB(8,10,18),       Bar=Color3.fromRGB(12,16,28),
+        Accent=Color3.fromRGB(0,255,209), GroupBg=Color3.fromRGB(12,16,28),
+        GroupBorder=Color3.fromRGB(26,38,56), GroupHead=Color3.fromRGB(15,22,38),
+        TabOn=Color3.fromRGB(0,255,209),  TabOff=Color3.fromRGB(118,142,170),
+        Text=Color3.fromRGB(232,245,255),  Dim=Color3.fromRGB(141,172,196),
+        TogOn=Color3.fromRGB(0,255,209),   TogOff=Color3.fromRGB(20,34,44),
+        Thumb=Color3.fromRGB(245,250,255), Btn=Color3.fromRGB(18,28,42),
+        Sep=Color3.fromRGB(22,34,52),      SlidBg=Color3.fromRGB(14,22,34),
+        DropBg=Color3.fromRGB(9,12,20),    DropItem=Color3.fromRGB(14,22,34),
+        DropHover=Color3.fromRGB(24,40,62),DropSel=Color3.fromRGB(0,170,255),
+    },
+    Sunset = {
+        Bg=Color3.fromRGB(22,12,16),      Bar=Color3.fromRGB(34,18,22),
+        Accent=Color3.fromRGB(255,128,72), GroupBg=Color3.fromRGB(30,16,20),
+        GroupBorder=Color3.fromRGB(62,32,38), GroupHead=Color3.fromRGB(42,22,28),
+        TabOn=Color3.fromRGB(255,128,72), TabOff=Color3.fromRGB(180,140,144),
+        Text=Color3.fromRGB(255,239,232),  Dim=Color3.fromRGB(194,160,154),
+        TogOn=Color3.fromRGB(255,128,72),  TogOff=Color3.fromRGB(58,30,34),
+        Thumb=Color3.fromRGB(255,246,240), Btn=Color3.fromRGB(46,24,28),
+        Sep=Color3.fromRGB(56,30,34),      SlidBg=Color3.fromRGB(32,18,22),
+        DropBg=Color3.fromRGB(18,10,14),   DropItem=Color3.fromRGB(30,16,20),
+        DropHover=Color3.fromRGB(66,34,40),DropSel=Color3.fromRGB(255,94,58),
+    },
+    Ocean = {
+        Bg=Color3.fromRGB(9,16,22),       Bar=Color3.fromRGB(14,24,34),
+        Accent=Color3.fromRGB(64,196,255), GroupBg=Color3.fromRGB(14,24,34),
+        GroupBorder=Color3.fromRGB(28,44,58), GroupHead=Color3.fromRGB(18,30,42),
+        TabOn=Color3.fromRGB(64,196,255), TabOff=Color3.fromRGB(120,154,176),
+        Text=Color3.fromRGB(232,248,255),  Dim=Color3.fromRGB(148,182,198),
+        TogOn=Color3.fromRGB(64,196,255),  TogOff=Color3.fromRGB(22,40,52),
+        Thumb=Color3.fromRGB(245,252,255), Btn=Color3.fromRGB(20,34,46),
+        Sep=Color3.fromRGB(24,40,54),      SlidBg=Color3.fromRGB(14,26,36),
+        DropBg=Color3.fromRGB(10,18,26),   DropItem=Color3.fromRGB(16,28,40),
+        DropHover=Color3.fromRGB(28,52,72),DropSel=Color3.fromRGB(32,150,220),
+    },
+    Voltage = {
+        Bg=Color3.fromRGB(11,11,13),      Bar=Color3.fromRGB(18,18,22),
+        Accent=Color3.fromRGB(255,220,60), GroupBg=Color3.fromRGB(16,16,20),
+        GroupBorder=Color3.fromRGB(40,40,48), GroupHead=Color3.fromRGB(22,22,28),
+        TabOn=Color3.fromRGB(255,220,60), TabOff=Color3.fromRGB(150,150,160),
+        Text=Color3.fromRGB(246,246,240), Dim=Color3.fromRGB(168,168,156),
+        TogOn=Color3.fromRGB(255,220,60), TogOff=Color3.fromRGB(30,30,36),
+        Thumb=Color3.fromRGB(255,255,255), Btn=Color3.fromRGB(28,28,34),
+        Sep=Color3.fromRGB(34,34,42),     SlidBg=Color3.fromRGB(22,22,28),
+        DropBg=Color3.fromRGB(14,14,18),  DropItem=Color3.fromRGB(22,22,28),
+        DropHover=Color3.fromRGB(48,48,58),DropSel=Color3.fromRGB(200,170,42),
     },
     Dark = {
         Bg=Color3.fromRGB(12,12,16),      Bar=Color3.fromRGB(17,17,24),
@@ -63,7 +110,6 @@ Library.Themes = {
     },
 }
 
--- ── Helpers & Animation Engine ────────────────────────────────────────────────
 local baseTransMap = {}
 local notifyList = {}
 
@@ -104,7 +150,15 @@ local function keyName(kc)
     return s:match("KeyCode%.(.+)") or s:match("UserInputType%.(.+)") or s
 end
 
--- ── Notifications System (Sliding & Fading) ───────────────────────────────────
+function Library:GetThemeNames()
+    local names = {}
+    for name in pairs(Library.Themes) do
+        names[#names + 1] = name
+    end
+    table.sort(names)
+    return names
+end
+
 on(RunService.RenderStepped, function(dt)
     local vp = workspace.CurrentCamera.ViewportSize
     local currentY = vp.Y - 20 
@@ -118,17 +172,21 @@ on(RunService.RenderStepped, function(dt)
         
         local x = vp.X - notif.w - 20
         local y = notif.currentY
+        local progress = 1 - math.clamp((tick() - notif.createdAt) / notif.duration, 0, 1)
         
         pcall(function()
             notif.objs.bg.Position = Vector2.new(x, y)
             notif.objs.out.Position = Vector2.new(x, y)
             notif.objs.acc.Position = Vector2.new(x, y)
             notif.objs.txt.Position = Vector2.new(x + 12, y + (notif.h - notif.objs.txt.TextBounds.Y)/2)
+            notif.objs.bar.Position = Vector2.new(x + 3, y + notif.h - 3)
+            notif.objs.bar.Size = Vector2.new(math.max((notif.w - 6) * progress, 0), 2)
             
             notif.objs.bg.Color = T().GroupBg
             notif.objs.out.Color = T().GroupBorder
             notif.objs.acc.Color = T().Accent
             notif.objs.txt.Color = T().Text
+            notif.objs.bar.Color = T().Accent
         end)
         
         if tick() - notif.createdAt >= notif.duration and not notif.fadingOut then
@@ -138,12 +196,12 @@ on(RunService.RenderStepped, function(dt)
                     local a = 1 - (j/10)
                     pcall(function()
                         notif.objs.bg.Transparency = a; notif.objs.out.Transparency = a
-                        notif.objs.acc.Transparency = a; notif.objs.txt.Transparency = a
+                        notif.objs.acc.Transparency = a; notif.objs.txt.Transparency = a; notif.objs.bar.Transparency = a
                     end)
                     task.wait(0.015)
                 end
                 removeDrawing(notif.objs.bg); removeDrawing(notif.objs.out)
-                removeDrawing(notif.objs.acc); removeDrawing(notif.objs.txt)
+                removeDrawing(notif.objs.acc); removeDrawing(notif.objs.txt); removeDrawing(notif.objs.bar)
             end)
         end
     end
@@ -160,25 +218,26 @@ function Library:Notify(text, duration)
     
     local txt = d("Text", {Text=text, Size=14, Font=FONT, Outline=false, Color=T().Text, Visible=true, ZIndex=102})
     local bounds = txt.TextBounds
-    local w = bounds.X + 26
+    local w = math.max(bounds.X + 34, 150)
     local h = 30
     
     local bg = d("Square", {Filled=true, ZIndex=100, Rounding=4, Color=T().GroupBg, Visible=true})
     local out = d("Square", {Filled=false, ZIndex=100, Rounding=4, Thickness=1, Color=T().GroupBorder, Visible=true})
     local acc = d("Square", {Filled=true, ZIndex=101, Rounding=0, Color=T().Accent, Visible=true})
+    local bar = d("Square", {Filled=true, ZIndex=101, Rounding=0, Color=T().Accent, Visible=true})
     
-    baseTransMap[bg] = 1; baseTransMap[out] = 1; baseTransMap[acc] = 1; baseTransMap[txt] = 1
-    bg.Transparency = 0; out.Transparency = 0; acc.Transparency = 0; txt.Transparency = 0
+    baseTransMap[bg] = 1; baseTransMap[out] = 1; baseTransMap[acc] = 1; baseTransMap[txt] = 1; baseTransMap[bar] = 1
+    bg.Transparency = 0; out.Transparency = 0; acc.Transparency = 0; txt.Transparency = 0; bar.Transparency = 0
     
     local vp = workspace.CurrentCamera.ViewportSize
     local startY = vp.Y + h 
     
-    bg.Size = Vector2.new(w, h); out.Size = Vector2.new(w, h); acc.Size = Vector2.new(2, h)
+    bg.Size = Vector2.new(w, h); out.Size = Vector2.new(w, h); acc.Size = Vector2.new(2, h); bar.Size = Vector2.new(w - 6, 2)
     
     local notif = {
         targetY = startY, currentY = startY, createdAt = tick(),
         duration = duration, fadingOut = false, w = w, h = h,
-        objs = {bg=bg, out=out, acc=acc, txt=txt}
+        objs = {bg=bg, out=out, acc=acc, txt=txt, bar=bar}
     }
     
     table.insert(notifyList, notif)
@@ -192,14 +251,12 @@ function Library:Notify(text, duration)
     end)
 end
 
--- ── Theme API ─────────────────────────────────────────────────────────────────
 function Library:SetTheme(name)
     if not Library.Themes[name] then return end
     Library.CurrentThemeName = name
     for _,fn in ipairs(Library.ThemeUpdaters) do pcall(fn) end
 end
 
--- ── Config API ────────────────────────────────────────────────────────────────
 function Library:_regCfg(id, getFn, setFn)
     if id and id ~= "" then Library.ConfigData[id] = {get=getFn, set=setFn} end
 end
@@ -232,11 +289,9 @@ function Library:LoadConfig(name)
     return false
 end
 
--- ── Global overlay state ──────────────────────────────────────────────────────
 local activeDD   = nil  
 local activeBind = nil  
 
--- ── CreateWindow ──────────────────────────────────────────────────────────────
 function Library:CreateWindow(opts)
     local title   = opts.Title or "BHub"
     local BASE_W  = 520
@@ -280,7 +335,6 @@ function Library:CreateWindow(opts)
 
     local chromeObjs = {wShd, wBg, wOut, wBar, wBBt, wAcc, wTBg, wTSep, wTit, wGrip, wGrip2}
 
-    -- ── Animated Visibility toggle (FIXED TABS) ───────────────────────────────
     local isAnimating = false
     local function setVisible(v)
         if isAnimating or Win.Visible == v then return end
@@ -288,7 +342,6 @@ function Library:CreateWindow(opts)
         Win.Visible = v
 
         if not v then
-            -- Fade Out Active Items
             local activeObjs = {}
             for _, obj in ipairs(Library.Drawings) do
                 if obj.Visible then table.insert(activeObjs, obj) end
@@ -302,13 +355,11 @@ function Library:CreateWindow(opts)
                 task.wait(0.015)
             end
             
-            -- Hide everything and RESET transparency so inactive tabs aren't broken later
             for _, obj in ipairs(Library.Drawings) do
                 pcall(function() obj.Visible = false end)
                 pcall(function() obj.Transparency = (baseTransMap[obj] or 1) end)
             end
         else
-            -- Show targeted chrome and ONLY the active UI tab elements
             for _, obj in ipairs(chromeObjs) do pcall(function() obj.Visible = true end) end
             for _, btn in ipairs(Win.Btns) do
                 btn.bLbl.Visible = true; btn.bInd.Visible = (Win.Active == btn.Tab)
@@ -317,17 +368,15 @@ function Library:CreateWindow(opts)
                 for _, gb in ipairs(Win.Active.L) do gb.setVis(true) end
                 for _, gb in ipairs(Win.Active.R) do gb.setVis(true) end
             end
-            
-            -- Find what we just made visible, prep it for fade-in
+
             local activeObjs = {}
             for _, obj in ipairs(Library.Drawings) do
                 if obj.Visible then 
-                    pcall(function() obj.Transparency = 0 end) -- Pre-hide for animation
+                    pcall(function() obj.Transparency = 0 end)
                     table.insert(activeObjs, obj) 
                 end
             end
             
-            -- Fade In
             for i = 1, 10 do
                 local a = (i/10)
                 for _, obj in ipairs(activeObjs) do
@@ -335,8 +384,7 @@ function Library:CreateWindow(opts)
                 end
                 task.wait(0.015)
             end
-            
-            -- Failsafe: Snap to exact baseline opacity
+
             for _, obj in ipairs(activeObjs) do
                 pcall(function() obj.Transparency = (baseTransMap[obj] or 1) end)
             end
@@ -344,7 +392,6 @@ function Library:CreateWindow(opts)
         isAnimating = false
     end
 
-    -- ── Layout ───────────────────────────
     local function layout()
         COL = math.floor((W - PAD*2 - GAP) / 2)
         local tabRows, tx = 1, 10
@@ -866,6 +913,11 @@ function Library:CreateWindow(opts)
             local Drop = {}
             function Drop:SetValues(v)
                 vals=v; if not multi then val=v[1] end; dVal.Text=display()
+                if isOpen then openDD() end
+            end
+            function Drop:SetValue(v)
+                val = v
+                dVal.Text = display()
                 if isOpen then openDD() end
             end
             Library:_regCfg(id, function() return val end, function(v) val=v; dVal.Text=display(); if o.Callback then o.Callback(val) end end)

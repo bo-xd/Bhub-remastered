@@ -7,7 +7,7 @@ return function(Window, ESP, Library)
 
 	local hitboxEspEnabled = false
 	Visuals:AddToggle("EvadeHitboxESP", {
-		Text = "Enable Hitbox ESP",
+		Text = "NextBots ESP",
 		Default = false,
 		Callback = function(v)
 			hitboxEspEnabled = v
