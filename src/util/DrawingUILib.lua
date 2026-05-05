@@ -855,7 +855,7 @@ function Library:CreateWindow(opts)
                 local function createPopup(pos)
                     if popup.open then return end
                     popup.open = true
-                    local pW, pH = 300, 180
+                    local pW, pH = 260, 160
                     local pPos = pos + Vector2.new(-pW, 0)
                     local panel = d("Square", {Size=Vector2.new(pW, pH), Filled=true, Color=T().GroupBg, Rounding=6, Visible=true, ZIndex=30})
                     local title = d("Text", {Text=(co.Title or txt), Size=14, Font=FONT, Outline=false, Color=T().Text, Visible=true, ZIndex=31})
@@ -863,57 +863,46 @@ function Library:CreateWindow(opts)
                     panel.Position = fv(pPos)
                     title.Position = fv(pPos + Vector2.new(10, 6))
 
-                    local svW, svH = 160, 120
+                    local svW, svH = 180, 120
                     local svPos = pPos + Vector2.new(10, 24)
                     local hueW, hueH = 18, svH
                     local huePos = pPos + Vector2.new(10 + svW + 8, 24)
 
-                    local cols, rows = 12, 12
-                    local cellW, cellH = math.floor(svW/cols), math.floor(svH/rows)
+                    local cols, rows = 32, 24
+                    local cellW, cellH = svW / cols, svH / rows
                     local svCells = {}
 
-                    -- initial HSV
                     local ok, ch, cs, cv = pcall(function() return Color3.toHSV(pickerColor) end)
                     local curH = ok and ch or 0
                     local curS = ok and cs or 1
                     local curV = ok and cv or 1
 
-                    -- create SV grid
                     for r=0,rows-1 do
                         for c=0,cols-1 do
                             local x = svPos.X + c*cellW
                             local y = svPos.Y + r*cellH
-                            local cell = d("Square", {Size=Vector2.new(cellW-1, cellH-1), Filled=true, ZIndex=31, Rounding=0, Color=Color3.fromHSV(curH, c/(cols-1), 1 - r/(rows-1)), Visible=true})
+                            local cell = d("Square", {Size=Vector2.new(cellW + 0.6, cellH + 0.6), Filled=true, ZIndex=31, Rounding=0, Color=Color3.fromHSV(curH, c/(cols-1), 1 - r/(rows-1)), Visible=true})
                             cell.Position = fv(Vector2.new(x, y))
                             table.insert(svCells, {obj=cell, c=c, r=r})
                         end
                     end
 
-                    -- hue strip (approximate with segments)
                     local hueSegments = {}
                     local segs = 24
                     for i=0,segs-1 do
                         local hh = i/segs
-                        local seg = d("Square", {Size=Vector2.new(hueW, math.floor(hueH/segs)), Filled=true, ZIndex=31, Rounding=0, Color=Color3.fromHSV(hh,1,1), Visible=true})
-                        local sx = huePos.X
-                        local sy = huePos.Y + i*math.floor(hueH/segs)
-                        seg.Position = fv(Vector2.new(sx, sy))
-                        table.insert(hueSegments, {obj=seg, h=hh, y=sy})
+                        local segH = hueH / segs
+                        local seg = d("Square", {Size=Vector2.new(hueW, segH + 0.6), Filled=true, ZIndex=31, Rounding=0, Color=Color3.fromHSV(hh,1,1), Visible=true})
+                        seg.Position = fv(Vector2.new(huePos.X, huePos.Y + i*segH))
+                        table.insert(hueSegments, {obj=seg, h=hh})
                     end
 
-                    preview.Position = fv(pPos + Vector2.new(pW-68, 28))
-
-                    local presetObjs = {}
-                    for i, c in ipairs(colorPresets) do
-                        local px = 10 + ((i-1)%6)*38
-                        local py = pPos.Y + svH + 36 + math.floor((i-1)/6)*22
-                        local sw = d("Square", {Size=Vector2.new(34, 18), Filled=true, ZIndex=31, Rounding=4, Color=c, Visible=true})
-                        sw.Position = fv(Vector2.new(px, py))
-                        table.insert(presetObjs, {obj=sw, color=c})
-                    end
+                    local svCursor = d("Square", {Size=Vector2.new(8, 8), Filled=false, ZIndex=34, Rounding=4, Thickness=1, Color=Color3.new(1,1,1), Visible=true})
+                    local hueCursor = d("Square", {Size=Vector2.new(hueW + 2, 3), Filled=true, ZIndex=34, Rounding=2, Color=Color3.new(1,1,1), Visible=true})
+                    preview.Position = fv(pPos + Vector2.new(pW - 58, 26))
 
                     popup.panel = panel
-                    popup.elems = {title=title, sv=svCells, hue=hueSegments, preview=preview, presets=presetObjs}
+                    popup.elems = {title=title, sv=svCells, hue=hueSegments, preview=preview, svCursor=svCursor, hueCursor=hueCursor}
 
                     local dragging = nil
 
@@ -925,12 +914,19 @@ function Library:CreateWindow(opts)
                         end
                     end
 
-                    local function setHSV(h,s,v)
-                        curH, curS, curV = h, s, v
-                        applyColor(Color3.fromHSV(h, s, v))
+                    local function updateCursors()
+                        svCursor.Position = fv(Vector2.new(svPos.X + curS * svW - 4, svPos.Y + (1 - curV) * svH - 4))
+                        hueCursor.Position = fv(Vector2.new(huePos.X - 1, huePos.Y + curH * hueH - 1))
+                    end
+
+                    local function setHSV(h, s, v)
+                        curH, curS, curV = math.clamp(h, 0, 1), math.clamp(s, 0, 1), math.clamp(v, 0, 1)
+                        updateCursors()
+                        applyColor(Color3.fromHSV(curH, curS, curV))
                     end
 
                     updateSVGrid(curH)
+                    updateCursors()
 
                     local function closePopup()
                         if not popup.open then return end
@@ -938,6 +934,8 @@ function Library:CreateWindow(opts)
                         for _,v in pairs(popup.elems) do
                             if type(v)=="table" then
                                 for _,u in pairs(v) do if u.obj then u.obj.Visible=false end end
+                            elseif v and v.Visible ~= nil then
+                                v.Visible = false
                             end
                         end
                         if popup.panel then popup.panel.Visible=false end
@@ -948,36 +946,17 @@ function Library:CreateWindow(opts)
                     on(UserInputService.InputBegan, function(i)
                         if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
                         local m = UserInputService:GetMouseLocation()
-                        -- SV grid click
                         if m.X >= svPos.X and m.X <= svPos.X+svW and m.Y >= svPos.Y and m.Y <= svPos.Y+svH then
-                            local localX = m.X - svPos.X
-                            local localY = m.Y - svPos.Y
-                            local s = math.clamp(localX/svW, 0, 1)
-                            local v = math.clamp(1 - (localY/svH), 0, 1)
-                            setHSV(curH, s, v)
+                            setHSV(curH, math.clamp((m.X - svPos.X)/svW, 0, 1), math.clamp(1 - ((m.Y - svPos.Y)/svH), 0, 1))
                             dragging = "sv"
                             return
                         end
-                        -- hue strip click
                         if m.X >= huePos.X and m.X <= huePos.X+hueW and m.Y >= huePos.Y and m.Y <= huePos.Y+hueH then
-                            local localY = m.Y - huePos.Y
-                            local h = math.clamp(localY/hueH, 0, 1)
-                            curH = h
-                            updateSVGrid(curH)
-                            setHSV(curH, curS, curV)
+                            local h = math.clamp((m.Y - huePos.Y)/hueH, 0, 1)
+                            setHSV(h, curS, curV)
                             dragging = "hue"
                             return
                         end
-                        -- check presets
-                        for _, pr in ipairs(popup.elems.presets) do
-                            local p = pr.obj.Position; local sz = pr.obj.Size
-                            if (m.X >= p.X and m.X <= p.X+sz.X and m.Y >= p.Y and m.Y <= p.Y+sz.Y) then
-                                local ok2, ch2, cs2, cv2 = pcall(function() return Color3.toHSV(pr.color) end)
-                                if ok2 then setHSV(ch2, cs2, cv2) end
-                                return
-                            end
-                        end
-                        -- click outside closes
                         local panelP = panel.Position; local panelS = panel.Size
                         if not (m.X >= panelP.X and m.X <= panelP.X+panelS.X and m.Y >= panelP.Y and m.Y <= panelP.Y+panelS.Y) then
                             closePopup()
@@ -989,16 +968,11 @@ function Library:CreateWindow(opts)
                             local m = UserInputService:GetMouseLocation()
                             if dragging=="sv" then
                                 if m.X >= svPos.X and m.X <= svPos.X+svW and m.Y >= svPos.Y and m.Y <= svPos.Y+svH then
-                                    local s = math.clamp((m.X - svPos.X)/svW, 0, 1)
-                                    local v = math.clamp(1 - ((m.Y - svPos.Y)/svH), 0, 1)
-                                    setHSV(curH, s, v)
+                                    setHSV(curH, math.clamp((m.X - svPos.X)/svW, 0, 1), math.clamp(1 - ((m.Y - svPos.Y)/svH), 0, 1))
                                 end
                             elseif dragging=="hue" then
                                 if m.Y >= huePos.Y and m.Y <= huePos.Y+hueH then
-                                    local h = math.clamp((m.Y - huePos.Y)/hueH, 0, 1)
-                                    curH = h
-                                    updateSVGrid(curH)
-                                    setHSV(curH, curS, curV)
+                                    setHSV(math.clamp((m.Y - huePos.Y)/hueH, 0, 1), curS, curV)
                                 end
                             end
                         end
@@ -1010,6 +984,8 @@ function Library:CreateWindow(opts)
 
                     th(function()
                         if panel then panel.Color = T().GroupBg end
+                        if svCursor then svCursor.Color = T().Text end
+                        if hueCursor then hueCursor.Color = T().Text end
                     end)
                 end
 
