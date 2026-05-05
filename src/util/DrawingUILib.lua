@@ -159,6 +159,76 @@ function Library:GetThemeNames()
     return names
 end
 
+function Library:CreateLoader(opts)
+    opts = opts or {}
+    local title = opts.Title or "BHub Remastered"
+    local subtitle = opts.Subtitle or "Initializing"
+
+    local camera = workspace.CurrentCamera or workspace:FindFirstChildOfClass("Camera")
+    local vp = camera and camera.ViewportSize or Vector2.new(1920, 1080)
+    local panelW = math.clamp(opts.Width or 360, 300, 460)
+    local panelH = 150
+    local pos = Vector2.new(math.floor((vp.X - panelW) / 2), math.floor((vp.Y - panelH) / 2))
+
+    local dim = d("Square", {Filled=true, Color=Color3.new(0, 0, 0), Transparency=0.45, Visible=true, ZIndex=200, Size=vp, Position=Vector2.new(0, 0)})
+    local panel = d("Square", {Filled=true, Color=T().Bg, Visible=true, ZIndex=201, Rounding=8, Size=Vector2.new(panelW, panelH), Position=pos})
+    local border = d("Square", {Filled=false, Color=T().GroupBorder, Visible=true, ZIndex=201, Rounding=8, Thickness=1, Size=Vector2.new(panelW, panelH), Position=pos})
+    local accent = d("Square", {Filled=true, Color=T().Accent, Visible=true, ZIndex=202, Size=Vector2.new(panelW, 2), Position=pos})
+    local titleText = d("Text", {Text=title, Size=18, Font=FONT, Outline=false, Color=T().Text, Visible=true, ZIndex=203, Position=pos + Vector2.new(18, 16)})
+    local stageText = d("Text", {Text=subtitle, Size=13, Font=FONT, Outline=false, Color=T().Dim, Visible=true, ZIndex=203, Position=pos + Vector2.new(18, 44)})
+    local progressBg = d("Square", {Filled=true, Color=T().SlidBg, Visible=true, ZIndex=202, Rounding=3, Size=Vector2.new(panelW - 36, 8), Position=pos + Vector2.new(18, 100)})
+    local progressFill = d("Square", {Filled=true, Color=T().Accent, Visible=true, ZIndex=203, Rounding=3, Size=Vector2.new(1, 8), Position=pos + Vector2.new(18, 100)})
+    local percentText = d("Text", {Text="0%", Size=12, Font=FONT, Outline=false, Color=T().Dim, Visible=true, ZIndex=203, Position=pos + Vector2.new(panelW - 54, 76)})
+
+    local loader = { Progress = 0, Stage = subtitle }
+
+    function loader:SetStage(text, progress)
+        if text then
+            self.Stage = text
+            stageText.Text = text
+        end
+        if progress ~= nil then
+            self.Progress = math.clamp(progress, 0, 1)
+            progressFill.Size = Vector2.new(math.max((panelW - 36) * self.Progress, 1), 8)
+            percentText.Text = tostring(math.floor(self.Progress * 100)) .. "%"
+        end
+    end
+
+    function loader:SetProgress(progress)
+        self:SetStage(nil, progress)
+    end
+
+    function loader:Close()
+        for i = 1, 10 do
+            local a = 1 - (i / 10)
+            pcall(function()
+                dim.Transparency = 0.45 * a
+                panel.Transparency = a
+                border.Transparency = a
+                accent.Transparency = a
+                titleText.Transparency = a
+                stageText.Transparency = a
+                progressBg.Transparency = a
+                progressFill.Transparency = a
+                percentText.Transparency = a
+            end)
+            task.wait(0.015)
+        end
+        removeDrawing(dim)
+        removeDrawing(panel)
+        removeDrawing(border)
+        removeDrawing(accent)
+        removeDrawing(titleText)
+        removeDrawing(stageText)
+        removeDrawing(progressBg)
+        removeDrawing(progressFill)
+        removeDrawing(percentText)
+    end
+
+    loader:SetStage(subtitle, 0)
+    return loader
+end
+
 on(RunService.RenderStepped, function(dt)
     local vp = workspace.CurrentCamera.ViewportSize
     local currentY = vp.Y - 20 

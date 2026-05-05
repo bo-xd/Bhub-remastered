@@ -28,8 +28,13 @@ local function loadFile(path)
 end
 
 local Library = loadFile("src/util/DrawingUILib.lua")
-local Window = Library:CreateWindow({ Title = 'BHub Remastered' })
+local Loader = Library:CreateLoader({ Title = 'BHub Remastered', Subtitle = 'Starting up' })
+Loader:SetStage('Loading UI library', 0.15)
 local ESP = loadFile("src/util/Esp.lua")
+Loader:SetStage('Preparing themes', 0.35)
+
+Loader:SetStage('Building interface', 0.75)
+local Window = Library:CreateWindow({ Title = 'BHub Remastered' })
 
 local supportedGames = {
     [9872472334] = "src/games/evade.lua",
@@ -38,6 +43,7 @@ local supportedGames = {
 local gamePath = supportedGames[game.PlaceId]
 if gamePath then
     local gameScript = loadFile(gamePath)
+    Loader:SetStage('Preparing game module', 0.55)
     if gameScript then task.spawn(function() gameScript(Window, ESP, Library) end) end
 end
 
@@ -156,9 +162,14 @@ UserInputService.InputBegan:Connect(function(inp, gp)
     if gp then return end
     if inp.KeyCode == Enum.KeyCode.Delete then
         Window:SetVisible(not Window.Visible)
+    elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and inp.KeyCode == Enum.KeyCode.O then
+        applyThemeByIndex(-1)
     elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and inp.KeyCode == Enum.KeyCode.P then
         applyThemeByIndex(1)
-    elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and inp.KeyCode == Enum.KeyCode.Tab then
-        applyThemeByIndex(-1)
     end
+end)
+
+Loader:SetStage('Done', 1)
+task.delay(0.15, function()
+    pcall(function() Loader:Close() end)
 end)
