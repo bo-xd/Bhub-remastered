@@ -107,14 +107,13 @@ end
 -- ── Notifications System (Sliding & Fading) ───────────────────────────────────
 on(RunService.RenderStepped, function(dt)
     local vp = workspace.CurrentCamera.ViewportSize
-    local currentY = vp.Y - 20 -- Margin from bottom
+    local currentY = vp.Y - 20 
     
     for i = #notifyList, 1, -1 do
         local notif = notifyList[i]
-        currentY = currentY - notif.h - 10 -- Spacing
+        currentY = currentY - notif.h - 10 
         notif.targetY = currentY
         
-        -- Smooth sliding interpolation
         notif.currentY = notif.currentY + (notif.targetY - notif.currentY) * 12 * dt
         
         local x = vp.X - notif.w - 20
@@ -126,14 +125,12 @@ on(RunService.RenderStepped, function(dt)
             notif.objs.acc.Position = Vector2.new(x, y)
             notif.objs.txt.Position = Vector2.new(x + 12, y + (notif.h - notif.objs.txt.TextBounds.Y)/2)
             
-            -- Keep colors synced with active theme
             notif.objs.bg.Color = T().GroupBg
             notif.objs.out.Color = T().GroupBorder
             notif.objs.acc.Color = T().Accent
             notif.objs.txt.Color = T().Text
         end)
         
-        -- Handle Expiration and Fade-out
         if tick() - notif.createdAt >= notif.duration and not notif.fadingOut then
             notif.fadingOut = true
             task.spawn(function()
@@ -151,7 +148,6 @@ on(RunService.RenderStepped, function(dt)
         end
     end
     
-    -- Clean table
     for i = #notifyList, 1, -1 do
         if notifyList[i].fadingOut and tick() - notifyList[i].createdAt > notifyList[i].duration + 0.5 then
             table.remove(notifyList, i)
@@ -162,13 +158,11 @@ end)
 function Library:Notify(text, duration)
     duration = duration or 3
     
-    -- Create text to get bounds
     local txt = d("Text", {Text=text, Size=14, Font=FONT, Outline=false, Color=T().Text, Visible=true, ZIndex=102})
     local bounds = txt.TextBounds
     local w = bounds.X + 26
     local h = 30
     
-    -- Create base parts
     local bg = d("Square", {Filled=true, ZIndex=100, Rounding=4, Color=T().GroupBg, Visible=true})
     local out = d("Square", {Filled=false, ZIndex=100, Rounding=4, Thickness=1, Color=T().GroupBorder, Visible=true})
     local acc = d("Square", {Filled=true, ZIndex=101, Rounding=0, Color=T().Accent, Visible=true})
@@ -177,8 +171,7 @@ function Library:Notify(text, duration)
     bg.Transparency = 0; out.Transparency = 0; acc.Transparency = 0; txt.Transparency = 0
     
     local vp = workspace.CurrentCamera.ViewportSize
-    local startX = vp.X - w - 20
-    local startY = vp.Y + h -- Start offscreen
+    local startY = vp.Y + h 
     
     bg.Size = Vector2.new(w, h); out.Size = Vector2.new(w, h); acc.Size = Vector2.new(2, h)
     
@@ -190,7 +183,6 @@ function Library:Notify(text, duration)
     
     table.insert(notifyList, notif)
     
-    -- Fade in
     task.spawn(function()
         for i = 1, 10 do
             local a = i/10
@@ -241,8 +233,8 @@ function Library:LoadConfig(name)
 end
 
 -- ── Global overlay state ──────────────────────────────────────────────────────
-local activeDD   = nil  -- { close=fn, pos=V2, sz=V2 }
-local activeBind = nil  -- { cancel=fn }
+local activeDD   = nil  
+local activeBind = nil  
 
 -- ── CreateWindow ──────────────────────────────────────────────────────────────
 function Library:CreateWindow(opts)
@@ -288,7 +280,7 @@ function Library:CreateWindow(opts)
 
     local chromeObjs = {wShd, wBg, wOut, wBar, wBBt, wAcc, wTBg, wTSep, wTit, wGrip, wGrip2}
 
-    -- ── Animated Visibility toggle ───────────────────────────────
+    -- ── Animated Visibility toggle (FIXED TABS) ───────────────────────────────
     local isAnimating = false
     local function setVisible(v)
         if isAnimating or Win.Visible == v then return end
@@ -296,11 +288,12 @@ function Library:CreateWindow(opts)
         Win.Visible = v
 
         if not v then
-            -- Fade Out
+            -- Fade Out Active Items
             local activeObjs = {}
             for _, obj in ipairs(Library.Drawings) do
                 if obj.Visible then table.insert(activeObjs, obj) end
             end
+            
             for i = 1, 10 do
                 local a = 1 - (i/10)
                 for _, obj in ipairs(activeObjs) do
@@ -308,18 +301,14 @@ function Library:CreateWindow(opts)
                 end
                 task.wait(0.015)
             end
-            -- Hide and reset baseline
+            
+            -- Hide everything and RESET transparency so inactive tabs aren't broken later
             for _, obj in ipairs(Library.Drawings) do
                 pcall(function() obj.Visible = false end)
                 pcall(function() obj.Transparency = (baseTransMap[obj] or 1) end)
             end
         else
-            -- Set to 0 Transparency pre-show
-            for _, obj in ipairs(Library.Drawings) do
-                pcall(function() obj.Transparency = 0 end)
-            end
-            
-            -- Show targeted chrome and UI elements
+            -- Show targeted chrome and ONLY the active UI tab elements
             for _, obj in ipairs(chromeObjs) do pcall(function() obj.Visible = true end) end
             for _, btn in ipairs(Win.Btns) do
                 btn.bLbl.Visible = true; btn.bInd.Visible = (Win.Active == btn.Tab)
@@ -329,17 +318,27 @@ function Library:CreateWindow(opts)
                 for _, gb in ipairs(Win.Active.R) do gb.setVis(true) end
             end
             
-            -- Fade In
+            -- Find what we just made visible, prep it for fade-in
             local activeObjs = {}
             for _, obj in ipairs(Library.Drawings) do
-                if obj.Visible then table.insert(activeObjs, obj) end
+                if obj.Visible then 
+                    pcall(function() obj.Transparency = 0 end) -- Pre-hide for animation
+                    table.insert(activeObjs, obj) 
+                end
             end
+            
+            -- Fade In
             for i = 1, 10 do
                 local a = (i/10)
                 for _, obj in ipairs(activeObjs) do
                     pcall(function() obj.Transparency = (baseTransMap[obj] or 1) * a end)
                 end
                 task.wait(0.015)
+            end
+            
+            -- Failsafe: Snap to exact baseline opacity
+            for _, obj in ipairs(activeObjs) do
+                pcall(function() obj.Transparency = (baseTransMap[obj] or 1) end)
             end
         end
         isAnimating = false
