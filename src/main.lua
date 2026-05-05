@@ -126,19 +126,12 @@ MenuGroup:AddButton({ Text = 'Unload', Func = function()
 end })
 MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'Delete', NoUI = true, Text = 'Menu keybind' })
 
--- Hook MenuKeybind to toggle visibility
-local UserInputService = game:GetService("UserInputService")
+-- Simple menu toggle - check for Delete key (default keybind)
 UserInputService.InputBegan:Connect(function(inp, gp)
     if gp then return end
     if inp.UserInputType == Enum.UserInputType.Keyboard then
-        -- Check if pressed key matches MenuKeybind config value
-        local cfgMenuKey = Library.ConfigData['MenuKeybind']
-        if cfgMenuKey then
-            local storedVal = cfgMenuKey.get()
-            local ok, keyEnum = pcall(function() return Enum.KeyCode[storedVal] end)
-            if ok and keyEnum and inp.KeyCode == keyEnum then
-                Window:SetVisible(not Window.Visible)
-            end
+        if inp.KeyCode == Enum.KeyCode.Delete then
+            Window:SetVisible(not Window.Visible)
         end
     end
 end)

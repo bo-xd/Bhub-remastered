@@ -530,10 +530,11 @@ function Library:CreateWindow(opts)
             end
 
             local function openDD()
-                if not dBg or not dBg.Position then return end
+                if not dBg or not dBg.Position or dBg.Position == Vector2.new(0,0) then return end
                 if activeDD then activeDD.close(); activeDD=nil end
                 isOpen=true; pcall(function() dBg.Color=T().Accent end); dArr.Text="▴"
                 local count  = math.min(#vals, MAXDD)
+                if count == 0 then return end  -- No items to show
                 local listH  = count * DD_H + 6
                 local vp     = pcall(function() return workspace.CurrentCamera.ViewportSize end) and workspace.CurrentCamera.ViewportSize or Vector2.new(1920,1080)
                 local baseY  = dBg.Position.Y + dBg.Size.Y + 3
@@ -542,7 +543,8 @@ function Library:CreateWindow(opts)
                 lBg.Position =fv(Vector2.new(lx,baseY)); lBg.Size =fv(Vector2.new(lw,listH))
                 lOut.Position=fv(Vector2.new(lx,baseY)); lOut.Size=fv(Vector2.new(lw,listH))
                 lBg.Visible=true; lOut.Visible=true
-                for i, row in ipairs(pool) do
+                for i=1, count do
+                    local row = pool[i]
                     local v = vals[i]
                     if v then
                         local ry  = baseY + 3 + (i-1)*DD_H
@@ -563,8 +565,6 @@ function Library:CreateWindow(opts)
                             row.txt.Position = fv(Vector2.new(lx+10, ry+(DD_H-13)/2))
                         end
                         row.txt.Text=tostring(v); row.txt.Visible=true
-                    else
-                        row.bg.Visible=false; row.chk.Visible=false; row.box.Visible=false; row.txt.Visible=false
                     end
                 end
                 activeDD = {close=closeDD, pos=fv(Vector2.new(lx,baseY)), sz=fv(Vector2.new(lw,listH))}
