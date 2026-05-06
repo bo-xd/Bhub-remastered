@@ -3,7 +3,6 @@ local plr = plrs.LocalPlayer
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
-local GITHUB_TOKEN = "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"
 local REPO = "bo-xd/Bhub-remastered"
 local BRANCH = "main"
 
@@ -18,7 +17,8 @@ local function loadFile(path)
     local url = string.format("https://raw.githubusercontent.com/%s/%s/%s", REPO, BRANCH, path)
     local req = (http and http.request) or http_request or request
     if req then
-        local response = req({ Url = url, Method = "GET", Headers = { ["Authorization"] = "token " .. GITHUB_TOKEN, ["Accept"] = "application/vnd.github.v3.raw" } })
+        local headers = { ["Accept"] = "application/vnd.github.v3.raw" }
+        local response = req({ Url = url, Method = "GET", Headers = headers })
         if response.Success then
             local ok, res = pcall(function() return loadstring(response.Body)() end)
             if ok and res then return res end
@@ -83,28 +83,6 @@ EspGroup:AddToggle('EspDistance', { Text = 'Show Distance',   Default = true,  C
 EspGroup:AddToggle('EspHealth',   { Text = 'Show Health Bar', Default = true,  Callback = function(v) ESP.ShowHealth  = v end })
 EspGroup:AddToggle('EspTracers',  { Text = 'Show Tracers',    Default = false, Callback = function(v) ESP.ShowTracers = v end })
 
-local CharGroup = Tabs.Universal:AddRightGroupbox('Character')
-local wsVal, jpVal = 16, 50
-CharGroup:AddSlider('WalkSpeed', { Text = 'WalkSpeed', Min = 16, Max = 250, Default = 16, Rounding = 0, Callback = function(v) wsVal = v end })
-CharGroup:AddSlider('JumpPower', { Text = 'JumpPower', Min = 50, Max = 500, Default = 50, Rounding = 0, Callback = function(v) jpVal = v end })
-
-local infJump = false
-CharGroup:AddToggle('InfJump', { Text = 'Infinite Jump', Default = false, Callback = function(v) infJump = v end })
-
-UserInputService.JumpRequest:Connect(function()
-    if infJump then pcall(function() plr.Character.Humanoid:ChangeState("Jumping") end) end
-end)
-
-RunService.Heartbeat:Connect(function()
-    local char = plr.Character
-    local hum = char and char:FindFirstChild("Humanoid")
-    if hum then
-        if hum.WalkSpeed ~= wsVal then hum.WalkSpeed = wsVal end
-        if hum.JumpPower ~= jpVal then hum.JumpPower = jpVal end
-        hum.UseJumpPower = true
-    end
-end)
-
 local function setupPlayer(p)
     local function add(char)
         task.delay(0.5, function()
@@ -152,6 +130,43 @@ MenuGroup:AddButton({ Text = 'Open Quick Actions', Func = function()
         { Text = 'Next Theme', Callback = function() applyThemeByIndex(1) end },
         { Text = 'Unload UI', Callback = function() Library:Unload() end },
     })
+end })
+
+MenuGroup:AddButton({ Text = 'Join Discord', Func = function()
+    local inviteCode = "your-invite"
+    local inviteUrl = "https://discord.gg/" .. inviteCode
+    local HttpService = game:GetService("HttpService")
+    local success = false
+
+    local req = (syn and syn.request) or (http and http.request) or http_request or request
+    if req then
+        pcall(function()
+            local body = HttpService:JSONEncode({ cmd = "INVITE_BROWSER", args = { code = inviteCode }, nonce = tostring(math.random()) })
+            req({ Url = "http://127.0.0.1:6463/rpc?v=1", Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = body })
+            success = true
+        end)
+    end
+
+    pcall(function()
+        local gs = game:GetService("GuiService")
+        if gs and gs.OpenBrowserWindow then
+            pcall(function() gs:OpenBrowserWindow("discord://discordapp.com/invite/" .. inviteCode) end)
+            pcall(function() gs:OpenBrowserWindow(inviteUrl) end)
+            success = true
+        end
+    end)
+
+    -- Fallback: copy to clipboard
+    local okcb = pcall(function() setclipboard(inviteUrl) end)
+    if okcb then
+        Library:Notify('Discord invite copied to clipboard', 4, { Icon = 'D' })
+    else
+        if success then
+            Library:Notify('Attempted to open invite (check your Discord/browser)', 4, { Icon = 'D' })
+        else
+            Library:Notify('Could not open invite; manual link: ' .. inviteUrl, 6, { Icon = 'D' })
+        end
+    end
 end })
 
 ThemePicker = AppearanceGroup:AddDropdown('UiTheme', {
