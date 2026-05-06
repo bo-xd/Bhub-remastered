@@ -133,7 +133,7 @@ MenuGroup:AddButton({ Text = 'Open Quick Actions', Func = function()
 end })
 
 MenuGroup:AddButton({ Text = 'Join Discord', Func = function()
-    local inviteCode = "your-invite"
+    local inviteCode = "jTMB2gcQkY"
     local inviteUrl = "https://discord.gg/" .. inviteCode
     local HttpService = game:GetService("HttpService")
     local success = false
