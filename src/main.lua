@@ -138,7 +138,7 @@ MenuGroup:AddButton({ Text = 'Join Discord', Func = function()
     local HttpService = game:GetService("HttpService")
     local success = false
 
-    local req = (syn and syn.request) or (http and http.request) or http_request or request
+    local req = (http and http.request) or http_request or request
     if req then
         pcall(function()
             local body = HttpService:JSONEncode({ cmd = "INVITE_BROWSER", args = { code = inviteCode }, nonce = tostring(math.random()) })
