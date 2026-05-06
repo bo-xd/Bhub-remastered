@@ -2,7 +2,7 @@ return function(Window, ESP, Library)
 	local gameFolder = workspace:WaitForChild("Game")
 	local playersFolder = gameFolder:WaitForChild("Players")
 	local ChangePlayerMode = game:GetService("ReplicatedStorage").Events.Player.ChangePlayerMode
-	local State = workspace.Game.Players[game.Players.LocalPlayer.Name]:GetAttribute("State")
+	local State = workspace.Game.Players:WaitForChild(game.Players.LocalPlayer.Name):GetAttribute("State")
 
 	local EvadeTab = Window:AddTab("Evade")
 	local Misc = EvadeTab:AddLeftGroupbox("Misc")
@@ -13,7 +13,7 @@ return function(Window, ESP, Library)
 		Text = "NextBots ESP",
 		Default = false,
 		Callback = function(v)
-			hitboxEspEnabled = v
+			hitboxEspEnabled = v									
 		end,
 	})
 
