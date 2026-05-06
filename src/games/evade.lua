@@ -2,8 +2,7 @@ return function(Window, ESP, Library)
 	local gameFolder = workspace:WaitForChild("Game")
 	local playersFolder = gameFolder:WaitForChild("Players")
 	local ChangePlayerMode = game:GetService("ReplicatedStorage").Events.Player.ChangePlayerMode
-	local playerFolder = workspace.Game.Players:FindFirstChild(game.Players.LocalPlayer.Name)
-
+	
 	local EvadeTab = Window:AddTab("Evade")
 	local Misc = EvadeTab:AddLeftGroupbox("Misc")
 	local Visuals = EvadeTab:AddLeftGroupbox("Player ESP")
@@ -61,6 +60,8 @@ return function(Window, ESP, Library)
     task.spawn(function()
         while task.wait() do
             if AutoRevive then
+                local playerFolder = workspace.Game.Players:FindFirstChild(game.Players.LocalPlayer.Name)
+
                 if playerFolder and playerFolder:GetAttribute("State") == "Downed" then
                     ChangePlayerMode:FireServer(true)           
                 end
