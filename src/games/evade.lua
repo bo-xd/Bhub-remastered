@@ -2,7 +2,7 @@ return function(Window, ESP, Library)
 	local gameFolder = workspace:WaitForChild("Game")
 	local playersFolder = gameFolder:WaitForChild("Players")
 	local ChangePlayerMode = game:GetService("ReplicatedStorage").Events.Player.ChangePlayerMode
-	local State = workspace.Game.Players:WaitForChild(game.Players.LocalPlayer.Name):GetAttribute("State")
+	local playerFolder = workspace.Game.Players:FindFirstChild(game.Players.LocalPlayer.Name)
 
 	local EvadeTab = Window:AddTab("Evade")
 	local Misc = EvadeTab:AddLeftGroupbox("Misc")
@@ -50,19 +50,21 @@ return function(Window, ESP, Library)
 	end)
 
 	local AutoRevive = false;
-	Misc:AddToggle("EvadeAutoRevive", {
-		Text = "Auto Revive",
-		Default = false,
-		Callback = function(v)
-			AutoRevive = v
-		end,
-	})
+    Misc:AddToggle("EvadeAutoRevive", {
+        Text = "Auto Revive",
+        Default = false,
+        Callback = function(v)
+            AutoRevive = v
+        end,
+    })
 
-	task.spawn(function()
-		while task.wait() do
-			if AutoRevive and State == "Downed" then
-				ChangePlayerMode:FireServer(true)			
-			end
-		end
-	end)
+    task.spawn(function()
+        while task.wait() do
+            if AutoRevive then
+                if playerFolder and playerFolder:GetAttribute("State") == "Downed" then
+                    ChangePlayerMode:FireServer(true)           
+                end
+            end
+        end 
+    end)
 end
