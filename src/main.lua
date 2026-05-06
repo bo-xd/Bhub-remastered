@@ -156,7 +156,6 @@ MenuGroup:AddButton({ Text = 'Join Discord', Func = function()
         end
     end)
 
-    -- Fallback: copy to clipboard
     local okcb = pcall(function() setclipboard(inviteUrl) end)
     if okcb then
         Library:Notify('Discord invite copied to clipboard', 4, { Icon = 'D' })
