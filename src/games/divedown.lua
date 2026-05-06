@@ -115,7 +115,7 @@ return function(Window, ESP, Library)
     local mFilters, rFilters = {["Normal"]=true}, {["Normal"]=true}
     local selectedSpecificFish, targetFishInput = "Any", ""
 
-    FarmGroup:AddToggle('MapVacuum', { Text = 'Map Vacuum', Default = false, Callback = function(v) mapVacuumEnabled = v end })
+    FarmGroup:AddToggle('MapVacuum', { Text = 'Map Vacuum (equip TNT)', Default = false, Callback = function(v) mapVacuumEnabled = v end })
     FarmGroup:AddToggle('AutoFarm', { Text = 'Teleport Farm', Default = false, Callback = function(v) autofarmEnabled = v end })
     FarmGroup:AddToggle('AutoSell', { Text = 'Auto Sell', Default = false, Callback = function(v) autoSellEnabled = v end })
 
@@ -223,7 +223,7 @@ return function(Window, ESP, Library)
     task.spawn(function()
         local function getVal(m)
             if not m then return 0 end
-            -- try schedule-style API first
+            
             if type(m.NextBloopSpawn) == "function" then
                 local ok, nextT = pcall(function() return m.NextBloopSpawn(os.time()) end)
                 if ok and type(nextT) == "number" then return nextT end
@@ -232,7 +232,7 @@ return function(Window, ESP, Library)
                 local ok, nextT = pcall(function() return m.NextMermaidSpawn(os.time()) end)
                 if ok and type(nextT) == "number" then return nextT end
             end
-            -- fallbacks
+
             return m.NextSpawn or m.SpawnTime or m.Time or m.time or 0
         end
 
