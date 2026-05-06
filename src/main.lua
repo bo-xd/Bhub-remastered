@@ -6,6 +6,20 @@ local UserInputService = game:GetService("UserInputService")
 local REPO = "bo-xd/Bhub-remastered"
 local BRANCH = "main"
 
+local function hasDrawingSupport()
+    if type(Drawing) ~= "table" or type(Drawing.new) ~= "function" then
+        return false
+    end
+    local ok, probe = pcall(function()
+        local p = Drawing.new("Square")
+        if p and p.Remove then
+            p:Remove()
+        end
+        return true
+    end)
+    return ok and probe == true
+end
+
 local function loadFile(path)
     if isfile and readfile then
         local localPath = "Bhub-remastered/" .. path
@@ -27,10 +41,23 @@ local function loadFile(path)
     return nil
 end
 
-local Library = loadFile("src/util/DrawingUILib.lua")
+local useDrawing = hasDrawingSupport()
+local uiPath = useDrawing and "src/util/DrawingUILib.lua" or "src/util/NormalUILib.lua"
+local Library = loadFile(uiPath)
+if not Library and useDrawing then
+    useDrawing = false
+    uiPath = "src/util/NormalUILib.lua"
+    Library = loadFile(uiPath)
+end
+if not Library then
+    return warn("[BHub] Failed to load UI library")
+end
 local Loader = Library:CreateLoader({ Title = 'BHub Remastered', Subtitle = 'Starting up' })
 Loader:SetStage('Loading UI library', 0.15)
 local ESP = loadFile("src/util/Esp.lua")
+if not ESP then
+    return warn("[BHub] Failed to load ESP module")
+end
 Loader:SetStage('Preparing themes', 0.35)
 
 Loader:SetStage('Building interface', 0.75)
