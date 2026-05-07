@@ -206,6 +206,7 @@ function Compat.RunChecks(options)
     local unsupported = {}
     local newSupports = {}
     local disabledFeatures = {}
+    local currentDisabled = {}
 
     for _, check in ipairs(_checks) do
         local ok, val = pcall(check.test)
@@ -222,11 +223,10 @@ function Compat.RunChecks(options)
         Compat.Supports[check.id] = passed
         if not passed then
             disabledFeatures[check.id] = true
+            currentDisabled[check.id] = true
             table.insert(unsupported, check)
         end
     end
-
-    for k, _ in pairs(disabledFeatures) do Compat.DisabledFeatures[k] = true end
 
     local groups = {
         ConfigSaveLoad = { 'isfile', 'readfile', 'writefile', 'isfolder', 'makefolder' },
@@ -239,17 +239,19 @@ function Compat.RunChecks(options)
         DebugHelpers = { 'getgc', 'debug.getupvalues', 'debug.getprotos', 'debug.getinfo' },
     }
 
+    Compat.FeatureDependencies = groups
+
     for gname, deps in pairs(groups) do
         local ok = true
         for _, dep in ipairs(deps) do
             if not Compat.Supports[dep] then ok = false; break end
         end
-        if not ok then Compat.DisabledFeatures[gname] = true end
+        if not ok then currentDisabled[gname] = true end
     end
 
     local prev = Compat._prevDisabled or {}
     local now = {}
-    for k, _ in pairs(Compat.DisabledFeatures) do now[k] = true end
+    for k, _ in pairs(currentDisabled) do now[k] = true end
 
     for k, _ in pairs(now) do
         if not prev[k] then
@@ -264,6 +266,8 @@ function Compat.RunChecks(options)
             if hs then for _, h in ipairs(hs) do pcall(h, false) end end
         end
     end
+
+    Compat.DisabledFeatures = currentDisabled
 
     Compat._prevDisabled = {}
     for k, _ in pairs(now) do Compat._prevDisabled[k] = true end

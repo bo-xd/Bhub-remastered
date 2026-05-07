@@ -139,6 +139,12 @@ if not Library and useDrawing then
     uiPath = "src/util/ui/NormalUILib.lua"
     Library = loadFile(uiPath)
 end
+
+local function isFeatureDisabled(featureName)
+    if not Compat or not Compat.DisabledFeatures then return false end
+    return Compat.DisabledFeatures[featureName] == true
+end
+
 if not Library then
     return warn("[BHub] Failed to load UI library")
 end
@@ -209,9 +215,9 @@ local function applyThemeByIndex(delta)
 end
 
 local EspGroup = Tabs.Universal:AddLeftGroupbox('Universal ESP')
-EspGroup:AddToggle('EspEnable',   { Text = 'Enable ESP',      Default = false, Callback = function(v) ESP.Enabled     = v end })
-EspGroup:AddToggle('EspBoxes',    { Text = 'Show Boxes',      Default = true,  Callback = function(v) ESP.ShowBoxes   = v end }):AddColorPicker('BoxColor',  { Default = Color3.new(1,1,1), Title = 'Box Color',  Callback = function(v) ESP.BoxColor  = v end })
-EspGroup:AddToggle('EspNames',    { Text = 'Show Names',      Default = true,  Callback = function(v) ESP.ShowNames   = v end }):AddColorPicker('TextColor', { Default = Color3.new(1,1,1), Title = 'Text Color', Callback = function(v) ESP.TextColor = v end })
+EspGroup:AddToggle('EspEnable',   { Text = 'Enable ESP',      Default = false, Callback = function(v) ESP.Enabled     = v end, Disabled = isFeatureDisabled('DrawingAPI') })
+EspGroup:AddToggle('EspBoxes',    { Text = 'Show Boxes',      Default = true,  Callback = function(v) ESP.ShowBoxes   = v end, Disabled = isFeatureDisabled('DrawingAPI') }):AddColorPicker('BoxColor',  { Default = Color3.new(1,1,1), Title = 'Box Color',  Callback = function(v) ESP.BoxColor  = v end })
+EspGroup:AddToggle('EspNames',    { Text = 'Show Names',      Default = true,  Callback = function(v) ESP.ShowNames   = v end, Disabled = isFeatureDisabled('DrawingAPI') }):AddColorPicker('TextColor', { Default = Color3.new(1,1,1), Title = 'Text Color', Callback = function(v) ESP.TextColor = v end })
 EspGroup:AddToggle('EspDistance', { Text = 'Show Distance',   Default = true,  Callback = function(v) ESP.ShowDistance = v end })
 EspGroup:AddToggle('EspHealth',   { Text = 'Show Health Bar', Default = true,  Callback = function(v) ESP.ShowHealth  = v end })
 EspGroup:AddToggle('EspTracers',  { Text = 'Show Tracers',    Default = false, Callback = function(v) ESP.ShowTracers = v end })
@@ -314,7 +320,7 @@ MenuGroup:AddButton({ Text = 'Join Discord', Func = function()
             Library:Notify('Could not open invite; manual link: ' .. inviteUrl, 6, { Icon = 'D' })
         end
     end
-end })
+end, Disabled = (isFeatureDisabled('HTTP') and isFeatureDisabled('ClipboardCopy')) })
 
 ThemePicker = AppearanceGroup:AddDropdown('UiTheme', {
     Text = 'Theme',
