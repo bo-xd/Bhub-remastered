@@ -114,7 +114,7 @@ Library.AccentOverride = nil
 
 local baseTransMap = {}
 local notifyList = {}
-local _disabledHoverBtns = {}
+local _disabledElems = {}
 local _tipObjs = nil
 
 local function getTip()
@@ -401,8 +401,8 @@ end
 on(RunService.RenderStepped, function(dt)
     local m = UserInputService:GetMouseLocation()
     local hovering = false
-    for _, btn in ipairs(_disabledHoverBtns) do
-        if btn.isActive() and over(btn.bg.Position, btn.bg.Size) then
+    for _, elem in ipairs(_disabledElems) do
+        if elem.isActive() and over(elem.getPos(), elem.getSize()) then
             hovering = true
             local tip = getTip()
             tip.txt.Text = "Incompatible"
@@ -832,14 +832,21 @@ function Library:CreateWindow(opts)
         function Obj:AddToggle(id, o)
             local txt = o.Text or id
             local st  = o.Default or false
+            local disabled = o.Disabled or false
             local iP  = Vector2.new()
             local isActive = false
-            local lbl = d("Text",  {Text=txt,Size=14,Font=FONT,Outline=false,Color=T().Text,Visible=false,ZIndex=20})
-            local trk = d("Square",{Size=Vector2.new(32,17),Filled=true,ZIndex=20,Rounding=8,Color=st and T().TogOn or T().TogOff,Visible=false})
-            local thb = d("Square",{Size=Vector2.new(13,13),Filled=true,ZIndex=21,Rounding=6,Color=T().Thumb,Visible=false})
-            th(function() lbl.Color=T().Text; trk.Color=st and T().TogOn or T().TogOff; thb.Color=T().Thumb end)
+            local lbl = d("Text",  {Text=txt,Size=14,Font=FONT,Outline=false,Color=disabled and T().Dim or T().Text,Visible=false,ZIndex=20})
+            local trk = d("Square",{Size=Vector2.new(32,17),Filled=true,ZIndex=20,Rounding=8,Color=disabled and T().Dim or (st and T().TogOn or T().TogOff),Visible=false})
+            local thb = d("Square",{Size=Vector2.new(13,13),Filled=true,ZIndex=21,Rounding=6,Color=disabled and T().Dim or T().Thumb,Visible=false})
+            th(function()
+                lbl.Color = disabled and T().Dim or T().Text
+                trk.Color = disabled and T().Dim or (st and T().TogOn or T().TogOff)
+                thb.Color = disabled and T().Dim or T().Thumb
+            end)
             local function refresh()
-                trk.Color = st and T().TogOn or T().TogOff
+                if not disabled then
+                    trk.Color = st and T().TogOn or T().TogOff
+                end
                 thb.Position = fv(iP + Vector2.new(COL-44+(st and 16 or 2), 6))
             end
             local it = {h=28}
@@ -853,11 +860,19 @@ function Library:CreateWindow(opts)
             on(UserInputService.InputBegan, function(i)
                 if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
                 if Win.Active ~= parentTab or not isActive then return end
+                if disabled then return end
                 if over(iP, Vector2.new(COL, 28)) then
                     st = not st; Tog.State = st; refresh()
                     if o.Callback then o.Callback(st) end
                 end
             end)
+            if disabled then
+                table.insert(_disabledElems, {
+                    getPos  = function() return iP end,
+                    getSize = function() return Vector2.new(COL, 28) end,
+                    isActive = function() return isActive and Win.Visible end,
+                })
+            end
             function Tog:AddColorPicker(id, co)
                 co = co or {}
                 local pickerColor = co.Default or Color3.new(1, 1, 1)
@@ -1088,8 +1103,9 @@ function Library:CreateWindow(opts)
                 end
             end)
             if disabled then
-                table.insert(_disabledHoverBtns, {
-                    bg = bg2,
+                table.insert(_disabledElems, {
+                    getPos  = function() return bg2.Position end,
+                    getSize = function() return bg2.Size end,
                     isActive = function() return isActive and Win.Visible end,
                 })
             end
@@ -1100,15 +1116,21 @@ function Library:CreateWindow(opts)
             local txt     = o.Text or id
             local mn, mx  = o.Min or 0, o.Max or 100
             local val     = o.Default or mn
+            local disabled = o.Disabled or false
             local sW      = COL - IP*2
             local iP      = Vector2.new()
             local drag    = false
             local isActive = false
-            local lbl  = d("Text",  {Text=txt..": "..tostring(val),Size=14,Font=FONT,Outline=false,Color=T().Text,Visible=false,ZIndex=20})
+            local lbl  = d("Text",  {Text=txt..": "..tostring(val),Size=14,Font=FONT,Outline=false,Color=disabled and T().Dim or T().Text,Visible=false,ZIndex=20})
             local sBg  = d("Square",{Size=Vector2.new(sW,6),Filled=true,ZIndex=20,Rounding=3,Color=T().SlidBg,Visible=false})
-            local sFll = d("Square",{Size=Vector2.new(((val-mn)/(mx-mn))*sW,6),Filled=true,ZIndex=21,Rounding=3,Color=T().Accent,Visible=false})
-            local sThb = d("Square",{Size=Vector2.new(12,12),Filled=true,ZIndex=22,Rounding=6,Color=T().Thumb,Visible=false})
-            th(function() lbl.Color=T().Text; sBg.Color=T().SlidBg; sFll.Color=T().Accent; sThb.Color=T().Thumb end)
+            local sFll = d("Square",{Size=Vector2.new(((val-mn)/(mx-mn))*sW,6),Filled=true,ZIndex=21,Rounding=3,Color=disabled and T().Dim or T().Accent,Visible=false})
+            local sThb = d("Square",{Size=Vector2.new(12,12),Filled=true,ZIndex=22,Rounding=6,Color=disabled and T().Dim or T().Thumb,Visible=false})
+            th(function()
+                lbl.Color = disabled and T().Dim or T().Text
+                sBg.Color = T().SlidBg
+                sFll.Color = disabled and T().Dim or T().Accent
+                sThb.Color = disabled and T().Dim or T().Thumb
+            end)
             local function apply(pct)
                 pct = math.clamp(pct, 0, 1)
                 val = mn + (mx-mn)*pct
@@ -1130,6 +1152,7 @@ function Library:CreateWindow(opts)
                 sThb.Position=fv(p+Vector2.new(IP+pct2*sW-6,25))
             end
             on(UserInputService.InputBegan, function(i)
+                if disabled then return end
                 if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
                 if Win.Active ~= parentTab or not isActive then return end
                 if over(sBg.Position, Vector2.new(sW, 16)) then
@@ -1138,8 +1161,16 @@ function Library:CreateWindow(opts)
             end)
             on(UserInputService.InputEnded, function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end end)
             on(RunService.RenderStepped, function()
+                if disabled then return end
                 if drag and Win.Active==parentTab and isActive then apply((UserInputService:GetMouseLocation().X-sBg.Position.X)/sW); Sld.Value=val end
             end)
+            if disabled then
+                table.insert(_disabledElems, {
+                    getPos  = function() return iP end,
+                    getSize = function() return Vector2.new(COL, 48) end,
+                    isActive = function() return isActive and Win.Visible end,
+                })
+            end
             Library:_regCfg(id, function() return val end, function(v) val=v; Sld.Value=v; apply((v-mn)/(mx-mn)) end)
             addIt(it)
             if o.Callback then task.spawn(o.Callback, val) end
@@ -1201,6 +1232,7 @@ function Library:CreateWindow(opts)
             local txt   = o.Text or id
             local vals  = o.Values or {}
             local multi = o.Multi
+            local disabled = o.Disabled or false
             local val   = o.Default
             local dW    = COL - IP*2
             local iP    = Vector2.new()
@@ -1214,11 +1246,23 @@ function Library:CreateWindow(opts)
             table.insert(Win.DropBtns, ddBtnRef)
             if not multi and val==nil and vals[1] then val=vals[1] end
 
-            local lbl  = d("Text",  {Text=txt,Size=14,Font=FONT,Outline=false,Color=T().Text,Visible=false,ZIndex=20})
-            local dBg  = d("Square",{Size=Vector2.new(dW,24),Filled=true,ZIndex=20,Rounding=4,Color=T().Btn,Visible=false,Position=Vector2.new(0,0)})
-            local dVal = d("Text",  {Size=13,Font=FONT,Outline=false,Color=T().Text,Visible=false,ZIndex=21})
+            local lbl  = d("Text",  {Text=txt,Size=14,Font=FONT,Outline=false,Color=disabled and T().Dim or T().Text,Visible=false,ZIndex=20})
+            local dBg  = d("Square",{Size=Vector2.new(dW,24),Filled=true,ZIndex=20,Rounding=4,Color=disabled and T().GroupBg or T().Btn,Visible=false,Position=Vector2.new(0,0)})
+            local dVal = d("Text",  {Size=13,Font=FONT,Outline=false,Color=disabled and T().Dim or T().Text,Visible=false,ZIndex=21})
             local dArr = d("Text",  {Text="▾",Size=12,Font=FONT,Outline=false,Color=T().Dim,Visible=false,ZIndex=21})
-            th(function() lbl.Color=T().Text; dBg.Color=isOpen and T().Accent or T().Btn; dVal.Color=T().Text; dArr.Color=T().Dim end)
+            th(function()
+                lbl.Color = disabled and T().Dim or T().Text
+                dBg.Color = disabled and T().GroupBg or (isOpen and T().Accent or T().Btn)
+                dVal.Color = disabled and T().Dim or T().Text
+                dArr.Color = T().Dim
+            end)
+            if disabled then
+                table.insert(_disabledElems, {
+                    getPos  = function() return iP end,
+                    getSize = function() return Vector2.new(COL, 52) end,
+                    isActive = function() return isActive and Win.Visible end,
+                })
+            end
 
             local function display()
                 if isOpen and searchQuery ~= "" then
@@ -1336,6 +1380,7 @@ function Library:CreateWindow(opts)
             on(UserInputService.InputBegan, function(i)
                 if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
                 if Win.Active ~= parentTab or not isActive then return end
+                if disabled then return end
                 if dBg and dBg.Position and dBg.Size and over(dBg.Position, dBg.Size) then
                     if activeDD and Win._activeDropRef and Win._activeDropRef ~= ddBtnRef then return end
                     if isOpen then closeDD(); activeDD=nil else openDD() end
@@ -1476,21 +1521,29 @@ function Library:CreateWindow(opts)
             local txt = o.Text or id
             local ok2, kc2 = pcall(function() return Enum.KeyCode[o.Default or "Unknown"] end)
             local kc = (ok2 and kc2) or Enum.KeyCode.Unknown
+            local disabled = o.Disabled or false
             local listening = false; local kbW = 64
             local isActive = false
-            local lbl   = d("Text",  {Text=txt,Size=14,Font=FONT,Outline=false,Color=T().Text,Visible=false,ZIndex=20})
-            local kbBg  = d("Square",{Size=Vector2.new(kbW,20),Filled=true,ZIndex=20,Rounding=3,Color=T().Btn,Visible=false})
-            local kbTxt = d("Text",  {Text=keyName(kc),Size=12,Font=FONT,Outline=false,Center=true,Color=T().Text,Visible=false,ZIndex=21})
-            th(function() lbl.Color=T().Text; kbBg.Color=listening and T().Accent or T().Btn; kbTxt.Color=T().Text end)
+            local iP = Vector2.new()
+            local lbl   = d("Text",  {Text=txt,Size=14,Font=FONT,Outline=false,Color=disabled and T().Dim or T().Text,Visible=false,ZIndex=20})
+            local kbBg  = d("Square",{Size=Vector2.new(kbW,20),Filled=true,ZIndex=20,Rounding=3,Color=disabled and T().GroupBg or T().Btn,Visible=false})
+            local kbTxt = d("Text",  {Text=keyName(kc),Size=12,Font=FONT,Outline=false,Center=true,Color=disabled and T().Dim or T().Text,Visible=false,ZIndex=21})
+            th(function()
+                lbl.Color = disabled and T().Dim or T().Text
+                kbBg.Color = disabled and T().GroupBg or (listening and T().Accent or T().Btn)
+                kbTxt.Color = disabled and T().Dim or T().Text
+            end)
             local it = {h=28}
             function it.setVis(v) lbl.Visible=v; kbBg.Visible=v; kbTxt.Visible=v; isActive=v end
             function it.setPos(p)
+                iP=p
                 lbl.Position  = fv(p+Vector2.new(IP,7))
                 kbBg.Position = fv(p+Vector2.new(COL-kbW-IP,4))
                 kbTxt.Position= fv(p+Vector2.new(COL-kbW/2-IP,8))
             end
             local Bind = {Value=kc}
             on(UserInputService.InputBegan, function(i)
+                if disabled then return end
                 if i.UserInputType==Enum.UserInputType.MouseButton1 and over(kbBg.Position, kbBg.Size) and Win.Active==parentTab and isActive then
                     if activeBind then activeBind.cancel() end
                     listening=true; kbBg.Color=T().Accent; kbTxt.Text="..."
@@ -1507,6 +1560,13 @@ function Library:CreateWindow(opts)
                 end
                 if not listening and i.KeyCode==kc then if o.OnKey then o.OnKey() end end
             end)
+            if disabled then
+                table.insert(_disabledElems, {
+                    getPos  = function() return iP end,
+                    getSize = function() return Vector2.new(COL, 28) end,
+                    isActive = function() return isActive and Win.Visible end,
+                })
+            end
             Library:_regCfg(id, function() return tostring(kc) end, function(v) local ok3,k3=pcall(function() return Enum.KeyCode[v] end); if ok3 and k3 then kc=k3; Bind.Value=kc; kbTxt.Text=keyName(kc) end end)
             addIt(it); return Bind
         end

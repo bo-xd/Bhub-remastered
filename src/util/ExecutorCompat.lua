@@ -29,8 +29,6 @@ local Fallbacks = {
 function Compat:RunChecks()
     self.Supports = {}
     self.DisabledFeatures = {}
-    local missing = {}
-    local seen = {}
 
     for feature, reqs in pairs(FeatureRequirements) do
         local featureDisabled = false
@@ -47,25 +45,9 @@ function Compat:RunChecks()
             end
             if not self.Supports[funcPath] then
                 featureDisabled = true
-                if not seen[funcPath] then
-                    seen[funcPath] = true
-                    table.insert(missing, funcPath)
-                end
             end
         end
         self.DisabledFeatures[feature] = featureDisabled
-    end
-
-    if #missing > 0 then
-        task.spawn(function()
-            local elapsed = 0
-            while not _G.Library and elapsed < 10 do
-                task.wait(0.1); elapsed += 0.1
-            end
-            if _G.Library and type(_G.Library.Notify) == "function" then
-                _G.Library:Notify("Executor limited: " .. table.concat(missing, ", "), 6)
-            end
-        end)
     end
 
     return self.DisabledFeatures

@@ -160,7 +160,7 @@ local function ensureRootGui()
     return gui
 end
 
-local function showTip(anchor, text)
+local function showTip(text)
     ensureRootGui()
     if not Library._tooltip then
         local f = Instance.new("Frame", Library.RootGui)
@@ -194,13 +194,33 @@ local function showTip(anchor, text)
         end)
     end
     Library._tooltip._tipLabel.Text = text
-    local abs = anchor.AbsolutePosition
-    Library._tooltip.Position = UDim2.fromOffset(math.max(abs.X, 0), math.max(abs.Y - 26, 0))
+    local m = UserInputService:GetMouseLocation()
+    Library._tooltip.Position = UDim2.fromOffset(m.X + 14, m.Y - 28)
     Library._tooltip.Visible = true
+end
+
+local function updateTipPos()
+    if Library._tooltip and Library._tooltip.Visible then
+        local m = UserInputService:GetMouseLocation()
+        Library._tooltip.Position = UDim2.fromOffset(m.X + 14, m.Y - 28)
+    end
 end
 
 local function hideTip()
     if Library._tooltip then Library._tooltip.Visible = false end
+end
+
+local function applyDisabledOverlay(row)
+    local overlay = Instance.new("TextButton")
+    overlay.Size = UDim2.new(1, 0, 1, 0)
+    overlay.BackgroundTransparency = 1
+    overlay.Text = ""
+    overlay.ZIndex = 50
+    overlay.AutoButtonColor = false
+    overlay.Parent = row
+    overlay.MouseEnter:Connect(function() showTip("Incompatible") end)
+    overlay.MouseMoved:Connect(updateTipPos)
+    overlay.MouseLeave:Connect(hideTip)
 end
 
 function Library:GetThemeNames()
@@ -796,6 +816,7 @@ function Library:CreateWindow(opts)
             o = o or {}
             local txt = o.Text or id
             local state = o.Default or false
+            local disabled = o.Disabled or false
 
             local row = mkRow(30)
             local label = Instance.new("TextLabel")
@@ -804,7 +825,7 @@ function Library:CreateWindow(opts)
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.Font = Enum.Font.Gotham
             label.TextSize = 14
-            label.TextColor3 = T().Text
+            label.TextColor3 = disabled and T().Dim or T().Text
             label.Text = txt
             label.Parent = row
 
@@ -813,7 +834,7 @@ function Library:CreateWindow(opts)
             button.Position = UDim2.new(1, -40, 0.5, -10)
             button.Text = ""
             button.BorderSizePixel = 0
-            button.BackgroundColor3 = state and T().TogOn or T().TogOff
+            button.BackgroundColor3 = disabled and T().TogOff or (state and T().TogOn or T().TogOff)
             button.Parent = row
 
             local buttonCorner = Instance.new("UICorner")
@@ -823,7 +844,7 @@ function Library:CreateWindow(opts)
             local thumb = Instance.new("Frame")
             thumb.Size = UDim2.new(0, 14, 0, 14)
             thumb.Position = state and UDim2.new(1, -16, 0, 3) or UDim2.new(0, 2, 0, 3)
-            thumb.BackgroundColor3 = T().Thumb
+            thumb.BackgroundColor3 = disabled and T().Dim or T().Thumb
             thumb.BorderSizePixel = 0
             thumb.Parent = button
 
@@ -844,19 +865,21 @@ function Library:CreateWindow(opts)
             end
 
             button.Activated:Connect(function()
+                if disabled then return end
                 applyState(not state, true)
             end)
 
             th(function()
-                label.TextColor3 = T().Text
-                button.BackgroundColor3 = state and T().TogOn or T().TogOff
-                thumb.BackgroundColor3 = T().Thumb
+                label.TextColor3 = disabled and T().Dim or T().Text
+                button.BackgroundColor3 = disabled and T().TogOff or (state and T().TogOn or T().TogOff)
+                thumb.BackgroundColor3 = disabled and T().Dim or T().Thumb
             end)
 
             Library:_regCfg(id, function() return state end, function(v) applyState(v, true) end)
             if o.Callback then
                 task.spawn(o.Callback, state)
             end
+            if disabled then applyDisabledOverlay(row) end
 
             function Tog:AddColorPicker(cpId, co)
                 co = co or {}
@@ -1044,10 +1067,7 @@ function Library:CreateWindow(opts)
             corner.CornerRadius = UDim.new(0, 4)
             corner.Parent = btn
 
-            if disabled then
-                btn.MouseEnter:Connect(function() showTip(btn, "Incompatible") end)
-                btn.MouseLeave:Connect(hideTip)
-            end
+            if disabled then applyDisabledOverlay(row) end
 
             btn.Activated:Connect(function()
                 if disabled then return end
@@ -1079,6 +1099,7 @@ function Library:CreateWindow(opts)
             local mn = o.Min or 0
             local mx = o.Max or 100
             local value = o.Default or mn
+            local disabled = o.Disabled or false
 
             local row = mkRow(50)
             local label = Instance.new("TextLabel")
@@ -1088,7 +1109,7 @@ function Library:CreateWindow(opts)
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.Font = Enum.Font.Gotham
             label.TextSize = 14
-            label.TextColor3 = T().Text
+            label.TextColor3 = disabled and T().Dim or T().Text
             label.Parent = row
 
             local bar = Instance.new("Frame")
@@ -1147,6 +1168,7 @@ function Library:CreateWindow(opts)
             end
 
             bar.InputBegan:Connect(function(input)
+                if disabled then return end
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     dragging = true
                     setFromMouse()
@@ -1160,16 +1182,17 @@ function Library:CreateWindow(opts)
             end)
 
             UserInputService.InputChanged:Connect(function(input)
-                if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                if disabled or not dragging then return end
+                if input.UserInputType == Enum.UserInputType.MouseMovement then
                     setFromMouse()
                 end
             end)
 
             th(function()
-                label.TextColor3 = T().Text
+                label.TextColor3 = disabled and T().Dim or T().Text
                 bar.BackgroundColor3 = T().SlidBg
-                fill.BackgroundColor3 = T().Accent
-                knob.BackgroundColor3 = T().Thumb
+                fill.BackgroundColor3 = disabled and T().Dim or T().Accent
+                knob.BackgroundColor3 = disabled and T().Dim or T().Thumb
             end)
 
             local api = { Value = value }
@@ -1184,6 +1207,7 @@ function Library:CreateWindow(opts)
             if o.Callback then
                 task.spawn(o.Callback, value)
             end
+            if disabled then applyDisabledOverlay(row) end
             return api
         end
 
@@ -1192,6 +1216,7 @@ function Library:CreateWindow(opts)
             local txt = o.Text or id
             local vals = o.Values or {}
             local multi = o.Multi
+            local disabled = o.Disabled or false
             local value = o.Default
             if not multi and value == nil then
                 value = vals[1]
@@ -1205,7 +1230,7 @@ function Library:CreateWindow(opts)
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.Font = Enum.Font.Gotham
             label.TextSize = 14
-            label.TextColor3 = T().Text
+            label.TextColor3 = disabled and T().Dim or T().Text
             label.Text = txt
             label.Parent = row
 
@@ -1213,7 +1238,7 @@ function Library:CreateWindow(opts)
             btn.Size = UDim2.new(1, -8, 0, 24)
             btn.Position = UDim2.new(0, 4, 0, 24)
             btn.Text = ""
-            btn.BackgroundColor3 = T().Btn
+            btn.BackgroundColor3 = disabled and T().GroupBg or T().Btn
             btn.BorderSizePixel = 0
             btn.Parent = row
 
@@ -1228,7 +1253,7 @@ function Library:CreateWindow(opts)
             valText.TextXAlignment = Enum.TextXAlignment.Left
             valText.Font = Enum.Font.Gotham
             valText.TextSize = 13
-            valText.TextColor3 = T().Text
+            valText.TextColor3 = disabled and T().Dim or T().Text
             valText.Parent = btn
 
             local arrow = Instance.new("TextLabel")
@@ -1351,6 +1376,7 @@ function Library:CreateWindow(opts)
             end
 
             btn.Activated:Connect(function()
+                if disabled then return end
                 open = not open
                 arrow.Text = open and "▴" or "▾"
                 if open then
@@ -1389,9 +1415,9 @@ function Library:CreateWindow(opts)
             end
 
             th(function()
-                label.TextColor3 = T().Text
-                btn.BackgroundColor3 = T().Btn
-                valText.TextColor3 = T().Text
+                label.TextColor3 = disabled and T().Dim or T().Text
+                btn.BackgroundColor3 = disabled and T().GroupBg or T().Btn
+                valText.TextColor3 = disabled and T().Dim or T().Text
                 arrow.TextColor3 = T().Dim
                 list.BackgroundColor3 = T().DropBg
                 listStroke.Color = T().GroupBorder
@@ -1411,6 +1437,7 @@ function Library:CreateWindow(opts)
             if o.Callback then
                 task.spawn(o.Callback, value)
             end
+            if disabled then applyDisabledOverlay(row) end
             return api
         end
 
@@ -1418,6 +1445,7 @@ function Library:CreateWindow(opts)
             o = o or {}
             local txt = o.Text or id
             local key = Enum.KeyCode[o.Default or "Unknown"] or Enum.KeyCode.Unknown
+            local disabled = o.Disabled or false
             local listening = false
 
             local row = mkRow(30)
@@ -1427,7 +1455,7 @@ function Library:CreateWindow(opts)
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.Font = Enum.Font.Gotham
             label.TextSize = 14
-            label.TextColor3 = T().Text
+            label.TextColor3 = disabled and T().Dim or T().Text
             label.Text = txt
             label.Parent = row
 
@@ -1437,8 +1465,8 @@ function Library:CreateWindow(opts)
             btn.Text = keyNameFromCode(key)
             btn.Font = Enum.Font.Gotham
             btn.TextSize = 12
-            btn.TextColor3 = T().Text
-            btn.BackgroundColor3 = T().Btn
+            btn.TextColor3 = disabled and T().Dim or T().Text
+            btn.BackgroundColor3 = disabled and T().GroupBg or T().Btn
             btn.BorderSizePixel = 0
             btn.Parent = row
 
@@ -1447,6 +1475,7 @@ function Library:CreateWindow(opts)
             corner.Parent = btn
 
             btn.Activated:Connect(function()
+                if disabled then return end
                 listening = true
                 btn.Text = "..."
                 btn.BackgroundColor3 = T().Accent
@@ -1474,9 +1503,9 @@ function Library:CreateWindow(opts)
             end)
 
             th(function()
-                label.TextColor3 = T().Text
-                btn.BackgroundColor3 = T().Btn
-                btn.TextColor3 = T().Text
+                label.TextColor3 = disabled and T().Dim or T().Text
+                btn.BackgroundColor3 = disabled and T().GroupBg or T().Btn
+                btn.TextColor3 = disabled and T().Dim or T().Text
             end)
 
             Library:_regCfg(id, function() return tostring(key) end, function(v)
@@ -1487,6 +1516,7 @@ function Library:CreateWindow(opts)
                 end
             end)
 
+            if disabled then applyDisabledOverlay(row) end
             return { Value = key }
         end
 
@@ -1576,6 +1606,7 @@ function Library:CreateWindow(opts)
             o = o or {}
             local txt = o.Text or id
             local cur = o.Default or ""
+            local disabled = o.Disabled or false
 
             local row = mkRow(54)
             local label = Instance.new("TextLabel")
@@ -1585,15 +1616,15 @@ function Library:CreateWindow(opts)
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.Font = Enum.Font.Gotham
             label.TextSize = 14
-            label.TextColor3 = T().Text
+            label.TextColor3 = disabled and T().Dim or T().Text
             label.Text = txt
             label.Parent = row
 
             local box = Instance.new("TextBox")
             box.Size = UDim2.new(1, -8, 0, 26)
             box.Position = UDim2.new(0, 4, 0, 24)
-            box.BackgroundColor3 = T().Btn
-            box.TextColor3 = T().Text
+            box.BackgroundColor3 = disabled and T().GroupBg or T().Btn
+            box.TextColor3 = disabled and T().Dim or T().Text
             box.PlaceholderText = "Type..."
             box.PlaceholderColor3 = T().Dim
             box.Font = Enum.Font.Gotham
@@ -1602,6 +1633,7 @@ function Library:CreateWindow(opts)
             box.TextXAlignment = Enum.TextXAlignment.Left
             box.Text = tostring(cur)
             box.BorderSizePixel = 0
+            box.Editable = not disabled
             box.Parent = row
 
             local corner = Instance.new("UICorner")
@@ -1609,6 +1641,7 @@ function Library:CreateWindow(opts)
             corner.Parent = box
 
             box.FocusLost:Connect(function(enterPressed)
+                if disabled then return end
                 cur = box.Text
                 if o.Callback then
                     o.Callback(cur)
@@ -1616,9 +1649,9 @@ function Library:CreateWindow(opts)
             end)
 
             th(function()
-                label.TextColor3 = T().Text
-                box.BackgroundColor3 = T().Btn
-                box.TextColor3 = T().Text
+                label.TextColor3 = disabled and T().Dim or T().Text
+                box.BackgroundColor3 = disabled and T().GroupBg or T().Btn
+                box.TextColor3 = disabled and T().Dim or T().Text
                 box.PlaceholderColor3 = T().Dim
             end)
 
@@ -1635,6 +1668,7 @@ function Library:CreateWindow(opts)
             if o.Callback then
                 task.spawn(o.Callback, cur)
             end
+            if disabled then applyDisabledOverlay(row) end
             return api
         end
 
