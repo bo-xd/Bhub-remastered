@@ -184,6 +184,7 @@ local function showTip(text)
         lbl.TextSize = 12
         lbl.TextColor3 = T().Dim
         lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.ZIndex = 1000
         Library._tooltip = f
         th(function()
             if f.Parent then
