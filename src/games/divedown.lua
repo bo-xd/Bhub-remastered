@@ -223,7 +223,7 @@ return function(Window, ESP, Library)
     task.spawn(function()
         local function getVal(m)
             if not m then return 0 end
-            
+
             if type(m.NextBloopSpawn) == "function" then
                 local ok, nextT = pcall(function() return m.NextBloopSpawn(os.time()) end)
                 if ok and type(nextT) == "number" then return nextT end
@@ -287,7 +287,7 @@ return function(Window, ESP, Library)
     MiscUtils:AddButton({ Text = 'Instant Respawn', Func = function() RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\007")) end })
     MiscUtils:AddButton({ Text = 'Weather Machine', Func = function() RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\024")) end })
     MiscUtils:AddButton({ Text = 'Rainbow Machine', Func = function() RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\025")) end })
-    
+
     local autoShopTreats, autoShopTools = false, false
     local ShopGroup = MiscTab:AddRightGroupbox('Auto Shop')
     ShopGroup:AddToggle('AutoTreats', { Text = 'Auto Buy Treats', Default = false, Callback = function(v) autoShopTreats = v end })
@@ -301,7 +301,7 @@ return function(Window, ESP, Library)
             RS:WaitForChild("Packets"):WaitForChild("Packet"):WaitForChild("RemoteEvent"):FireServer(buffer.fromstring(str))
         end)
     end
-    
+
     task.spawn(function()
         while true do
             task.wait(3)
@@ -319,37 +319,31 @@ return function(Window, ESP, Library)
                     if not scroll then return end
 
                     for _, itemFrame in pairs(scroll:GetChildren()) do
-                        if not (itemFrame:IsA("Frame") or itemFrame:IsA("ImageButton") or itemFrame:IsA("TextButton")) then continue end
-                        local slot = itemFrame:FindFirstChild("SlotTemplate")
-                        local stockLabel = slot and slot:FindFirstChild("StockAmount")
-                        local key = storeName..":"..tostring(itemFrame.Name)
+                        if itemFrame:IsA("Frame") or itemFrame:IsA("ImageButton") or itemFrame:IsA("TextButton") then
+                            local slot = itemFrame:FindFirstChild("SlotTemplate")
+                            local stockLabel = slot and slot:FindFirstChild("StockAmount")
+                            local key = storeName..":"..tostring(itemFrame.Name)
 
-                        -- Skip if we've marked this item known-empty
-                        if knownEmpty[key] then continue end
+                            if not knownEmpty[key] then
+                                if stockLabel and stockLabel:IsA("TextLabel") then
+                                    local txt = tostring(stockLabel.Text or "")
+                                    local stockNum = tonumber(txt:match("%d+")) or 0
 
-                        if stockLabel and stockLabel:IsA("TextLabel") then
-                            local txt = tostring(stockLabel.Text or "")
-                            local stockNum = tonumber(txt:match("%d+")) or 0
+                                    if stockNum <= 0 then
+                                        knownEmpty[key] = true
+                                    else
+                                        knownEmpty[key] = nil
 
-                            -- If no numeric stock found, mark as empty and skip
-                            if stockNum <= 0 then
-                                knownEmpty[key] = true
-                                continue
+                                        if not ((storeName == "Treat" and not autoShopTreats) or (storeName == "Tool" and not autoShopTools)) then
+                                            local last = buyCache[key]
+                                            if not (last and tick() - last < 30) then
+                                                fireBuyItem(storeName, itemFrame.Name)
+                                                buyCache[key] = tick()
+                                            end
+                                        end
+                                    end
+                                end
                             end
-
-                            -- Clear known-empty marker since numeric stock is present
-                            knownEmpty[key] = nil
-
-                            -- Respect toggles
-                            if (storeName == "Treat" and not autoShopTreats) or (storeName == "Tool" and not autoShopTools) then continue end
-
-                            -- Rate-limit per item key (30s)
-                            local last = buyCache[key]
-                            if last and tick() - last < 30 then continue end
-
-                            -- Buy one unit (safer), record attempt
-                            fireBuyItem(storeName, itemFrame.Name)
-                            buyCache[key] = tick()
                         end
                     end
                 end

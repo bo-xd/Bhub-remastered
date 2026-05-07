@@ -383,19 +383,19 @@ end
 
 on(RunService.RenderStepped, function(dt)
     local vp = workspace.CurrentCamera.ViewportSize
-    local currentY = vp.Y - 20 
-    
+    local currentY = vp.Y - 20
+
     for i = #notifyList, 1, -1 do
         local notif = notifyList[i]
-        currentY = currentY - notif.h - 10 
+        currentY = currentY - notif.h - 10
         notif.targetY = currentY
-        
+
         notif.currentY = notif.currentY + (notif.targetY - notif.currentY) * 12 * dt
-        
+
         local x = vp.X - notif.w - 20
         local y = notif.currentY
         local progress = 1 - math.clamp((tick() - notif.createdAt) / notif.duration, 0, 1)
-        
+
         pcall(function()
             notif.objs.bg.Position = Vector2.new(x, y)
             notif.objs.out.Position = Vector2.new(x, y)
@@ -404,7 +404,7 @@ on(RunService.RenderStepped, function(dt)
             notif.objs.txt.Position = Vector2.new(x + 28, y + (notif.h - notif.objs.txt.TextBounds.Y)/2)
             notif.objs.bar.Position = Vector2.new(x + 3, y + notif.h - 3)
             notif.objs.bar.Size = Vector2.new(math.max((notif.w - 6) * progress, 0), 2)
-            
+
             notif.objs.bg.Color = T().GroupBg
             notif.objs.out.Color = T().GroupBorder
             notif.objs.acc.Color = T().Accent
@@ -412,7 +412,7 @@ on(RunService.RenderStepped, function(dt)
             notif.objs.txt.Color = T().Text
             notif.objs.bar.Color = T().Accent
         end)
-        
+
         if tick() - notif.createdAt >= notif.duration and not notif.fadingOut then
             notif.fadingOut = true
             task.spawn(function()
@@ -429,7 +429,7 @@ on(RunService.RenderStepped, function(dt)
             end)
         end
     end
-    
+
     for i = #notifyList, 1, -1 do
         if notifyList[i].fadingOut and tick() - notifyList[i].createdAt > notifyList[i].duration + 0.5 then
             table.remove(notifyList, i)
@@ -440,34 +440,34 @@ end)
 function Library:Notify(text, duration, opts)
     duration = duration or 3
     opts = opts or {}
-    
+
     local txt = d("Text", {Text=text, Size=14, Font=FONT, Outline=false, Color=T().Text, Visible=true, ZIndex=102})
     local ico = d("Text", {Text=opts.Icon or "•", Size=14, Font=FONT, Outline=false, Color=T().Accent, Visible=true, ZIndex=102})
     local bounds = txt.TextBounds
     local w = math.max(bounds.X + 48, 160)
     local h = 30
-    
+
     local bg = d("Square", {Filled=true, ZIndex=100, Rounding=4, Color=T().GroupBg, Visible=true})
     local out = d("Square", {Filled=false, ZIndex=100, Rounding=4, Thickness=1, Color=T().GroupBorder, Visible=true})
     local acc = d("Square", {Filled=true, ZIndex=101, Rounding=0, Color=T().Accent, Visible=true})
     local bar = d("Square", {Filled=true, ZIndex=101, Rounding=0, Color=T().Accent, Visible=true})
-    
+
     baseTransMap[bg] = 1; baseTransMap[out] = 1; baseTransMap[acc] = 1; baseTransMap[txt] = 1; baseTransMap[bar] = 1; baseTransMap[ico] = 1
     bg.Transparency = 0; out.Transparency = 0; acc.Transparency = 0; txt.Transparency = 0; bar.Transparency = 0; ico.Transparency = 0
-    
+
     local vp = workspace.CurrentCamera.ViewportSize
-    local startY = vp.Y + h 
-    
+    local startY = vp.Y + h
+
     bg.Size = Vector2.new(w, h); out.Size = Vector2.new(w, h); acc.Size = Vector2.new(2, h); bar.Size = Vector2.new(w - 6, 2)
-    
+
     local notif = {
         targetY = startY, currentY = startY, createdAt = tick(),
         duration = duration, fadingOut = false, w = w, h = h,
         objs = {bg=bg, out=out, acc=acc, txt=txt, bar=bar, ico=ico}
     }
-    
+
     table.insert(notifyList, notif)
-    
+
     task.spawn(function()
         for i = 1, 10 do
             local a = i/10
@@ -525,21 +525,21 @@ function Library:LoadConfig(name)
     return false
 end
 
-local activeDD   = nil  
-local activeBind = nil  
+local activeDD   = nil
+local activeBind = nil
 
 function Library:CreateWindow(opts)
     local title   = opts.Title or "BHub"
     local BASE_W  = 520
-    local W       = BASE_W         
-    local BAR     = 32            
-    local TAB_RH  = 26            
+    local W       = BASE_W
+    local BAR     = 32
+    local TAB_RH  = 26
     local PAD     = 8
     local GAP     = 6
     local COL     = math.floor((W - PAD*2 - GAP) / 2)
-    local IP      = 8             
-    local MAXDD   = 14            
-    local DD_H    = 22            
+    local IP      = 8
+    local MAXDD   = 14
+    local DD_H    = 22
     local MIN_W   = BASE_W
     local MAX_W   = 900
     local MIN_H   = 300
@@ -582,7 +582,7 @@ function Library:CreateWindow(opts)
             for _, obj in ipairs(Library.Drawings) do
                 if obj.Visible then table.insert(activeObjs, obj) end
             end
-            
+
             for i = 1, 10 do
                 local a = 1 - (i/10)
                 for _, obj in ipairs(activeObjs) do
@@ -590,7 +590,7 @@ function Library:CreateWindow(opts)
                 end
                 task.wait(0.015)
             end
-            
+
             for _, obj in ipairs(Library.Drawings) do
                 pcall(function() obj.Visible = false end)
                 pcall(function() obj.Transparency = (baseTransMap[obj] or 1) end)
@@ -607,12 +607,12 @@ function Library:CreateWindow(opts)
 
             local activeObjs = {}
             for _, obj in ipairs(Library.Drawings) do
-                if obj.Visible then 
+                if obj.Visible then
                     pcall(function() obj.Transparency = 0 end)
-                    table.insert(activeObjs, obj) 
+                    table.insert(activeObjs, obj)
                 end
             end
-            
+
             for i = 1, 10 do
                 local a = (i/10)
                 for _, obj in ipairs(activeObjs) do
@@ -1025,12 +1025,13 @@ function Library:CreateWindow(opts)
         function Obj:AddButton(o)
             local txt = type(o)=="table" and o.Text or tostring(o)
             local fn  = type(o)=="table" and o.Func or function() end
+            local disabled = type(o) == "table" and o.Disabled or false
             local bW  = COL - IP*2
             local iP  = Vector2.new()
             local isActive = false
-            local bg2 = d("Square",{Size=Vector2.new(bW,24),Filled=true,ZIndex=20,Rounding=4,Color=T().Btn,Visible=false})
-            local lt  = d("Text",  {Text=txt,Size=14,Font=FONT,Outline=false,Center=true,Color=T().Text,ZIndex=21,Visible=false})
-            th(function() bg2.Color=T().Btn; lt.Color=T().Text end)
+            local bg2 = d("Square",{Size=Vector2.new(bW,24),Filled=true,ZIndex=20,Rounding=4,Color=(disabled and T().GroupBg or T().Btn),Visible=false})
+            local lt  = d("Text",  {Text=(disabled and (txt.." (disabled)") or txt),Size=14,Font=FONT,Outline=false,Center=true,Color=(disabled and T().Dim or T().Text),ZIndex=21,Visible=false})
+            th(function() if disabled then bg2.Color = T().GroupBg; lt.Color = T().Dim else bg2.Color = T().Btn; lt.Color = T().Text end end)
             local it = {h=32}
             function it.setVis(v) bg2.Visible=v; lt.Visible=v; isActive=v end
             function it.setPos(p)
@@ -1041,6 +1042,7 @@ function Library:CreateWindow(opts)
                 if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
                 if Win.Active ~= parentTab or not isActive then return end
                 if over(bg2.Position, bg2.Size) then
+                    if disabled then pcall(function() Library:Notify('This feature is disabled by your executor.', 3) end); return end
                     bg2.Color = T().Accent; if fn then fn() end
                     task.delay(0.13, function() pcall(function() bg2.Color = T().Btn end) end)
                 end
@@ -1231,7 +1233,7 @@ function Library:CreateWindow(opts)
                 rebuildFiltered()
                 local count  = math.min(#filteredVals, MAXDD)
                 local scrollIndex = 1
-                if count == 0 then return end  
+                if count == 0 then return end
                 local listH  = count * DD_H + 6
                 local vp     = pcall(function() return workspace.CurrentCamera.ViewportSize end) and workspace.CurrentCamera.ViewportSize or Vector2.new(1920,1080)
                 local baseY  = dBg.Position.Y + dBg.Size.Y + 3

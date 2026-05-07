@@ -106,19 +106,27 @@ local function applyTheme()
     end
 end
 
-local function getGuiParent()
-    local ok, hui = pcall(function()
-        if type(gethui) == "function" then
-            return gethui()
+local getGuiParent
+do
+    local ok, compat = pcall(function() return (type(getgenv) == "function" and getgenv().BHub_Compat) or _G.BHub_Compat end)
+    if ok and compat and type(compat.GetGuiParent) == "function" then
+        getGuiParent = compat.GetGuiParent
+    else
+        getGuiParent = function()
+            local ok, hui = pcall(function()
+                if type(gethui) == "function" then
+                    return gethui()
+                end
+            end)
+            if ok and hui then
+                return hui
+            end
+            if LocalPlayer then
+                return LocalPlayer:WaitForChild("PlayerGui")
+            end
+            return game:GetService("CoreGui")
         end
-    end)
-    if ok and hui then
-        return hui
     end
-    if LocalPlayer then
-        return LocalPlayer:WaitForChild("PlayerGui")
-    end
-    return game:GetService("CoreGui")
 end
 
 local function ensureRootGui()
@@ -974,17 +982,19 @@ function Library:CreateWindow(opts)
         function Obj:AddButton(o)
             local txt = type(o) == "table" and o.Text or tostring(o)
             local fn = type(o) == "table" and o.Func or function() end
+            local disabled = type(o) == "table" and o.Disabled or false
             local row = mkRow(32)
 
             local btn = Instance.new("TextButton")
             btn.Size = UDim2.new(1, -8, 0, 24)
             btn.Position = UDim2.new(0, 4, 0, 4)
-            btn.Text = txt
+            btn.Text = disabled and (txt .. " (disabled)") or txt
             btn.Font = Enum.Font.Gotham
             btn.TextSize = 14
-            btn.TextColor3 = T().Text
-            btn.BackgroundColor3 = T().Btn
+            btn.TextColor3 = disabled and T().Dim or T().Text
+            btn.BackgroundColor3 = disabled and T().GroupBg or T().Btn
             btn.BorderSizePixel = 0
+            btn.AutoButtonColor = not disabled
             btn.Parent = row
 
             local corner = Instance.new("UICorner")
@@ -992,6 +1002,10 @@ function Library:CreateWindow(opts)
             corner.Parent = btn
 
             btn.Activated:Connect(function()
+                if disabled then
+                    pcall(function() Library:Notify('This feature is disabled by your executor.', 3) end)
+                    return
+                end
                 btn.BackgroundColor3 = T().Accent
                 pcall(fn)
                 task.delay(0.1, function()
@@ -1002,8 +1016,13 @@ function Library:CreateWindow(opts)
             end)
 
             th(function()
-                btn.TextColor3 = T().Text
-                btn.BackgroundColor3 = T().Btn
+                if disabled then
+                    btn.TextColor3 = T().Dim
+                    btn.BackgroundColor3 = T().GroupBg
+                else
+                    btn.TextColor3 = T().Text
+                    btn.BackgroundColor3 = T().Btn
+                end
             end)
 
             return {}

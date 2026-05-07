@@ -21,33 +21,49 @@ local ESP = {
     _usingDrawing = false,
 }
 
-local function canUseDrawing()
-    if type(Drawing) ~= "table" or type(Drawing.new) ~= "function" then
-        return false
+local canUseDrawing
+do
+    local ok, compat = pcall(function() return (type(getgenv) == "function" and getgenv().BHub_Compat) or _G.BHub_Compat end)
+    if ok and compat and type(compat.CanUseDrawing) == "function" then
+        canUseDrawing = compat.CanUseDrawing
+    else
+        canUseDrawing = function()
+            if type(Drawing) ~= "table" or type(Drawing.new) ~= "function" then
+                return false
+            end
+            local ok = pcall(function()
+                local probe = Drawing.new("Square")
+                if probe and probe.Remove then probe:Remove() end
+            end)
+            return ok
+        end
     end
-    local ok = pcall(function()
-        local probe = Drawing.new("Square")
-        probe:Remove()
-    end)
-    return ok
 end
 
 ESP._usingDrawing = canUseDrawing()
 
-local function getGuiParent()
-    local ok, hui = pcall(function()
-        if type(gethui) == "function" then
-            return gethui()
+local getGuiParent
+do
+    local ok, compat = pcall(function() return (type(getgenv) == "function" and getgenv().BHub_Compat) or _G.BHub_Compat end)
+    if ok and compat and type(compat.GetGuiParent) == "function" then
+        getGuiParent = compat.GetGuiParent
+    else
+        getGuiParent = function()
+            local ok, hui = pcall(function()
+                if type(gethui) == "function" then
+                    return gethui()
+                end
+            end)
+            if ok and hui then
+                return hui
+            end
+            local lp = Players.LocalPlayer
+            if lp then
+                return lp:WaitForChild("PlayerGui")
+            end
+            return game:GetService("CoreGui")
         end
-    end)
-    if ok and hui then
-        return hui
     end
-    local lp = Players.LocalPlayer
-    if lp then
-        return lp:WaitForChild("PlayerGui")
-    end
-    return game:GetService("CoreGui")
 end
 
 local function ensureOverlay()
@@ -67,13 +83,12 @@ end
 
 local function hideAll(components)
     for key, c in pairs(components) do
-        if type(key) == "string" and string.sub(key, 1, 1) == "_" then
-            continue
-        end
-        if c then
-            pcall(function()
-                c.Visible = false
-            end)
+        if not (type(key) == "string" and string.sub(key, 1, 1) == "_") then
+            if c then
+                pcall(function()
+                    c.Visible = false
+                end)
+            end
         end
     end
 end
@@ -222,20 +237,18 @@ function ESP:Remove(object)
     end
 
     for key, c in pairs(data.Components) do
-        if type(key) == "string" and string.sub(key, 1, 1) == "_" then
-            continue
-        end
-        if typeof(c) == "table" then
-            -- no-op
-        elseif self._usingDrawing then
-            pcall(function()
-                c.Visible = false
-            end)
-            pcall(function()
-                c:Remove()
-            end)
-        elseif typeof(c) == "Instance" and c ~= data.Components.Root then
-            c:Destroy()
+        if not (type(key) == "string" and string.sub(key, 1, 1) == "_") then
+            if typeof(c) == "table" then
+            elseif self._usingDrawing then
+                pcall(function()
+                    c.Visible = false
+                end)
+                pcall(function()
+                    c:Remove()
+                end)
+            elseif typeof(c) == "Instance" and c ~= data.Components.Root then
+                c:Destroy()
+            end
         end
     end
 
@@ -427,37 +440,33 @@ function ESP:Update()
     for obj, data in pairs(self.Objects) do
         if not obj or not obj.Parent or not data.PrimaryPart or not data.PrimaryPart.Parent then
             self:Remove(obj)
-            continue
-        end
-
-        local part = data.PrimaryPart
-        local globalOk = data.IsEnabled ~= nil or self.Enabled
-        local c = data.Components
-
-        if not globalOk or (data.IsEnabled and not data.IsEnabled()) then
-            hideAll(c)
-            continue
-        end
-
-        local rootPos = part.Position
-        local dist = localRoot and (localRoot.Position - rootPos).Magnitude or 0
-        if dist > self.MaxDistance then
-            hideAll(c)
-            continue
-        end
-
-        local topVP, onTop = cam:WorldToViewportPoint(rootPos + Vector3.new(0, 3, 0))
-        local bottomVP, onBottom = cam:WorldToViewportPoint(rootPos - Vector3.new(0, 3, 0))
-
-        if not (onTop or onBottom) or topVP.Z < 0 then
-            hideAll(c)
-            continue
-        end
-
-        if self._usingDrawing then
-            updateDrawingObject(self, data, localRoot, cam, topVP, bottomVP, dist)
         else
-            updateInstanceObject(self, data, localRoot, cam, topVP, bottomVP, dist)
+            local part = data.PrimaryPart
+            local globalOk = data.IsEnabled ~= nil or self.Enabled
+            local c = data.Components
+
+            if not globalOk or (data.IsEnabled and not data.IsEnabled()) then
+                hideAll(c)
+            else
+                local rootPos = part.Position
+                local dist = localRoot and (localRoot.Position - rootPos).Magnitude or 0
+                if dist > self.MaxDistance then
+                    hideAll(c)
+                else
+                    local topVP, onTop = cam:WorldToViewportPoint(rootPos + Vector3.new(0, 3, 0))
+                    local bottomVP, onBottom = cam:WorldToViewportPoint(rootPos - Vector3.new(0, 3, 0))
+
+                    if not (onTop or onBottom) or topVP.Z < 0 then
+                        hideAll(c)
+                    else
+                        if self._usingDrawing then
+                            updateDrawingObject(self, data, localRoot, cam, topVP, bottomVP, dist)
+                        else
+                            updateInstanceObject(self, data, localRoot, cam, topVP, bottomVP, dist)
+                        end
+                    end
+                end
+            end
         end
     end
 end
@@ -486,5 +495,63 @@ function ESP:Unload()
     self._overlay = nil
 end
 
+-- Toggle between Drawing API and Instance-based overlay at runtime.
+function ESP:SwitchDrawing(useDrawing)
+    if useDrawing == nil then return end
+    if self._usingDrawing == useDrawing then return end
+    self._usingDrawing = useDrawing
+
+    -- Snapshot existing objects
+    local snapshot = {}
+    for obj, data in pairs(self.Objects) do
+        snapshot[obj] = {
+            Name = data.Name,
+            Color = data.Color,
+            TextOnly = data.TextOnly,
+            IsEnabled = data.IsEnabled,
+            PrimaryPart = data.PrimaryPart,
+        }
+    end
+
+    -- Clear current components and recreate according to the new mode
+    self:Clear()
+
+    for obj, d in pairs(snapshot) do
+        pcall(function()
+            self:Add(obj, {
+                PrimaryPart = d.PrimaryPart,
+                Name = d.Name,
+                Color = d.Color,
+                TextOnly = d.TextOnly,
+                IsEnabled = d.IsEnabled,
+            })
+        end)
+    end
+
+    -- Ensure overlay exists for instance-based rendering
+    if not self._usingDrawing then
+        ensureOverlay()
+    else
+        -- if using drawing, remove overlay if present
+        if self._overlay and self._overlay.Parent then
+            self._overlay:Destroy()
+        end
+        self._overlay = nil
+    end
+end
+
 ESP:Init()
+
+-- Register with compatibility checker if available to switch drawing mode automatically
+pcall(function()
+    local compat = (type(getgenv) == "function" and getgenv().BHub_Compat) or _G.BHub_Compat
+    if compat and type(compat.RegisterFeatureHandler) == "function" then
+        compat.RegisterFeatureHandler("Drawing.new", function(disabled)
+            pcall(function()
+                ESP:SwitchDrawing(not disabled)
+            end)
+        end)
+    end
+end)
+
 return ESP

@@ -20,33 +20,123 @@ local function hasDrawingSupport()
     return ok and probe == true
 end
 
+local function compileAndRun(src)
+    if not src then return nil, "no source" end
+    local loader = loadstring or load
+    if not loader then return nil, "no loader available" end
+    local chunk, err = loader(src)
+    if not chunk then return nil, err end
+    local ok, res = pcall(chunk)
+    if not ok then return nil, res end
+    return res, nil
+end
+
+local function safeRequest(url)
+    local candidates = {
+        function(u) if type(http) == "table" and type(http.request) == "function" then return http.request({Url = u, Method = "GET"}) end end,
+        function(u) if type(http_request) == "function" then return http_request({Url = u, Method = "GET"}) end end,
+        function(u) if type(request) == "function" then return request({Url = u, Method = "GET"}) end end,
+        function(u) if type(game) == "userdata" and type(game.HttpGet) == "function" then local ok, body = pcall(function() return game:HttpGet(u) end); if ok then return { Success = true, Body = body } end end end,
+    }
+
+    for _, fn in ipairs(candidates) do
+        local ok, resp = pcall(fn, url)
+        if ok and resp ~= nil then
+            if type(resp) == "string" then
+                return { Success = true, Body = resp }
+            elseif type(resp) == "table" then
+                local body = resp.Body or resp.body or resp.Response or resp.response
+                local success
+                if resp.Success ~= nil then success = resp.Success
+                elseif resp.success ~= nil then success = resp.success
+                elseif resp.StatusCode ~= nil then success = tonumber(resp.StatusCode) >= 200 and tonumber(resp.StatusCode) < 400
+                else success = body ~= nil and body ~= ""
+                end
+                return { Success = success, Body = (body or "") }
+            end
+        end
+    end
+    return { Success = false, Body = nil }
+end
+
+local function ensureLocalFolderFor(path)
+    if type(isfolder) ~= "function" or type(makefolder) ~= "function" then return end
+    local parts = {}
+    for part in string.gmatch(path, "[^/]+") do table.insert(parts, part) end
+    local cur = ""
+    for i = 1, #parts - 1 do
+        cur = (cur == "") and parts[i] or (cur .. "/" .. parts[i])
+        if not isfolder(cur) then
+            pcall(function() makefolder(cur) end)
+        end
+    end
+end
+
+local function saveToLocal(path, content)
+    if type(writefile) ~= "function" then return end
+    pcall(function()
+        ensureLocalFolderFor(path)
+        writefile(path, content)
+    end)
+end
+
 local function loadFile(path)
-    if isfile and readfile then
+    if type(isfile) == "function" and type(readfile) == "function" then
         local localPath = "Bhub-remastered/" .. path
-        if isfile(localPath) then
-            local ok, res = pcall(function() return loadstring(readfile(localPath))() end)
-            if ok and res then return res end
+        local ok_exists, exists = pcall(function() return isfile(localPath) end)
+        if ok_exists and exists then
+            local ok_run, res_or_err = pcall(function()
+                local src = readfile(localPath)
+                local r, e = compileAndRun(src)
+                if r ~= nil then return r end
+                error(tostring(e))
+            end)
+            if ok_run then
+                return res_or_err
+            else
+                warn("[BHub] local module failed to load: " .. tostring(res_or_err))
+            end
         end
     end
+
     local url = string.format("https://raw.githubusercontent.com/%s/%s/%s", REPO, BRANCH, path)
-    local req = (http and http.request) or http_request or request
-    if req then
-        local headers = { ["Accept"] = "application/vnd.github.v3.raw" }
-        local response = req({ Url = url, Method = "GET", Headers = headers })
-        if response.Success then
-            local ok, res = pcall(function() return loadstring(response.Body)() end)
-            if ok and res then return res end
+    local resp = safeRequest(url)
+    if resp and resp.Success and resp.Body and resp.Body ~= "" then
+        local res, err = compileAndRun(resp.Body)
+        if res ~= nil then
+            pcall(function()
+                local localPath = "Bhub-remastered/" .. path
+                saveToLocal(localPath, resp.Body)
+            end)
+            return res
+        else
+            warn("[BHub] remote module compiled but errored at runtime: " .. tostring(err))
         end
+    else
+        warn("[BHub] failed to fetch remote module: " .. tostring(path))
     end
+
     return nil
 end
 
-local useDrawing = hasDrawingSupport()
-local uiPath = useDrawing and "src/util/DrawingUILib.lua" or "src/util/NormalUILib.lua"
+local Compat = loadFile("src/util/ExecutorCompat.lua")
+if not Compat then
+    local ok, g = pcall(function() return (type(getgenv) == "function" and getgenv()) or _G end)
+    if ok and g and g.BHub_Compat then Compat = g.BHub_Compat end
+end
+
+local useDrawing
+if Compat and type(Compat.Supports) == "table" and Compat.Supports["Drawing.new"] ~= nil then
+    useDrawing = Compat.Supports["Drawing.new"]
+else
+    useDrawing = hasDrawingSupport()
+end
+
+local uiPath = useDrawing and "src/util/ui/DrawingUILib.lua" or "src/util/ui/NormalUILib.lua"
 local Library = loadFile(uiPath)
 if not Library and useDrawing then
     useDrawing = false
-    uiPath = "src/util/NormalUILib.lua"
+    uiPath = "src/util/ui/NormalUILib.lua"
     Library = loadFile(uiPath)
 end
 if not Library then
@@ -67,11 +157,27 @@ local supportedGames = {
     [9872472334] = "src/games/evade.lua",
     [131756752872026] = "src/games/divedown.lua",
 }
+
 local gamePath = supportedGames[game.PlaceId]
 if gamePath then
     local gameScript = loadFile(gamePath)
     Loader:SetStage('Preparing game module', 0.55)
-    if gameScript then task.spawn(function() gameScript(Window, ESP, Library) end) end
+    if gameScript then
+        task.spawn(function()
+            local ok, err = pcall(function() gameScript(Window, ESP, Library) end)
+            if not ok then
+                pcall(function()
+                    if Library and type(Library.Notify) == "function" then
+                        Library:Notify("Game module error: " .. tostring(err), 6)
+                    elseif Compat and type(Compat.SafeNotify) == "function" then
+                        Compat.SafeNotify("Game module error", tostring(err), 6)
+                    else
+                        warn("[BHub] Game module error: " .. tostring(err))
+                    end
+                end)
+            end
+        end)
+    end
 end
 
 local Tabs = {
@@ -136,23 +242,38 @@ local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
 local AppearanceGroup = Tabs['UI Settings']:AddRightGroupbox('Appearance')
 local uc = false
 
+local function canUseFileIO()
+    if Compat and type(Compat.Supports) == 'table' then
+        return Compat.Supports['isfile'] and Compat.Supports['readfile'] and Compat.Supports['writefile'] and Compat.Supports['isfolder'] and Compat.Supports['makefolder']
+    end
+    return type(isfile) == 'function' and type(readfile) == 'function' and type(writefile) == 'function' and type(isfolder) == 'function' and type(makefolder) == 'function'
+end
+
 MenuGroup:AddButton({ Text = 'Save Config', Func = function()
+    if not canUseFileIO() then
+        Library:Notify('Save disabled — executor does not support local file I/O', 4, { Icon = 'S' })
+        return
+    end
     if Library:SaveConfig('default') then
         Library:Notify('Saved default config', 2, { Icon = 'S' })
     end
-end })
+end, Disabled = (not canUseFileIO()) })
 
 MenuGroup:AddButton({ Text = 'Load Config', Func = function()
+    if not canUseFileIO() then
+        Library:Notify('Load disabled — executor does not support local file I/O', 4, { Icon = 'L' })
+        return
+    end
     if Library:LoadConfig('default') then
         Library:Notify('Loaded default config', 2, { Icon = 'L' })
     end
-end })
+end, Disabled = (not canUseFileIO()) })
 
 MenuGroup:AddButton({ Text = 'Open Quick Actions', Func = function()
     CommandPalette:Open({
         { Text = 'Toggle Window', Callback = function() Window:SetVisible(not Window.Visible) end },
-        { Text = 'Load Config', Callback = function() Library:LoadConfig('default') end },
-        { Text = 'Save Config', Callback = function() Library:SaveConfig('default') end },
+        { Text = 'Load Config', Callback = function() if not canUseFileIO() then Library:Notify('Load disabled — executor does not support local file I/O', 4) return end; Library:LoadConfig('default') end },
+        { Text = 'Save Config', Callback = function() if not canUseFileIO() then Library:Notify('Save disabled — executor does not support local file I/O', 4) return end; Library:SaveConfig('default') end },
         { Text = 'Previous Theme', Callback = function() applyThemeByIndex(-1) end },
         { Text = 'Next Theme', Callback = function() applyThemeByIndex(1) end },
         { Text = 'Unload UI', Callback = function() Library:Unload() end },
@@ -238,8 +359,8 @@ UserInputService.InputBegan:Connect(function(inp, gp)
     elseif inp.KeyCode == Enum.KeyCode.K and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
         CommandPalette:Open({
             { Text = 'Toggle Window', Callback = function() Window:SetVisible(not Window.Visible) end },
-            { Text = 'Save Config', Callback = function() Library:SaveConfig('default') end },
-            { Text = 'Load Config', Callback = function() Library:LoadConfig('default') end },
+            { Text = 'Save Config', Callback = function() if not canUseFileIO() then Library:Notify('Save disabled — executor does not support local file I/O', 4) return end; Library:SaveConfig('default') end },
+            { Text = 'Load Config', Callback = function() if not canUseFileIO() then Library:Notify('Load disabled — executor does not support local file I/O', 4) return end; Library:LoadConfig('default') end },
             { Text = 'Previous Theme', Callback = function() applyThemeByIndex(-1) end },
             { Text = 'Next Theme', Callback = function() applyThemeByIndex(1) end },
         })
@@ -249,4 +370,24 @@ end)
 Loader:SetStage('Done', 1)
 task.delay(0.15, function()
     pcall(function() Loader:Close() end)
+end)
+
+pcall(function()
+    if Compat and type(Compat.RegisterFeatureHandler) == 'function' then
+        Compat.RegisterFeatureHandler('ConfigSaveLoad', function(disabled)
+            if disabled then
+                pcall(function() Library:Notify('Config save/load unavailable (executor limitation)', 6) end)
+            else
+                pcall(function() Library:Notify('Config save/load available', 4) end)
+            end
+        end)
+
+        Compat.RegisterFeatureHandler('DrawingAPI', function(disabled)
+            if disabled then
+                pcall(function() Library:Notify('Drawing API unavailable — visuals will use instance fallbacks', 6) end)
+            else
+                pcall(function() Library:Notify('Drawing API available — using high-performance visuals', 4) end)
+            end
+        end)
+    end
 end)

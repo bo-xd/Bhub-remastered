@@ -12,7 +12,7 @@ return function(Window, ESP, Library)
 		Text = "NextBots ESP",
 		Default = false,
 		Callback = function(v)
-			hitboxEspEnabled = v									
+			hitboxEspEnabled = v
 		end,
 	})
 
@@ -63,9 +63,9 @@ return function(Window, ESP, Library)
                 local playerFolder = workspace.Game.Players:FindFirstChild(game.Players.LocalPlayer.Name)
 
                 if playerFolder and playerFolder:GetAttribute("State") == "Downed" then
-                    ChangePlayerMode:FireServer(true)           
+                    ChangePlayerMode:FireServer(true)
                 end
             end
-        end 
+        end
     end)
 end
