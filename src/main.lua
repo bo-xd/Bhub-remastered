@@ -378,22 +378,3 @@ task.delay(0.15, function()
     pcall(function() Loader:Close() end)
 end)
 
-pcall(function()
-    if Compat and type(Compat.RegisterFeatureHandler) == 'function' then
-        Compat.RegisterFeatureHandler('ConfigSaveLoad', function(disabled)
-            if disabled then
-                pcall(function() Library:Notify('Config save/load unavailable (executor limitation)', 6) end)
-            else
-                pcall(function() Library:Notify('Config save/load available', 4) end)
-            end
-        end)
-
-        Compat.RegisterFeatureHandler('DrawingAPI', function(disabled)
-            if disabled then
-                pcall(function() Library:Notify('Drawing API unavailable — visuals will use instance fallbacks', 6) end)
-            else
-                pcall(function() Library:Notify('Drawing API available — using high-performance visuals', 4) end)
-            end
-        end)
-    end
-end)
