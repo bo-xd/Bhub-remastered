@@ -29,35 +29,43 @@ local Fallbacks = {
 function Compat:RunChecks()
     self.Supports = {}
     self.DisabledFeatures = {}
-
-    local allFunctions = {
-        "Drawing.new", "readfile", "writefile", "isfile", "makefolder", 
-        "request", "setclipboard", "queue_on_teleport", "fireproximityprompt",
-        "gethui", "getgenv"
-    }
-
-    for _, funcPath in ipairs(allFunctions) do
-        local found = resolve(funcPath)
-
-        if not found and Fallbacks[funcPath] then
-            for _, alt in ipairs(Fallbacks[funcPath]) do
-                found = resolve(alt)
-                if found then break end
-            end
-        end
-        
-        self.Supports[funcPath] = (found ~= nil)
-    end
+    local missing = {}
+    local seen = {}
 
     for feature, reqs in pairs(FeatureRequirements) do
-        local isDisabled = false
-        for _, req in ipairs(reqs) do
-            if not self.Supports[req] then
-                isDisabled = true
-                break
+        local featureDisabled = false
+        for _, funcPath in ipairs(reqs) do
+            if self.Supports[funcPath] == nil then
+                local found = resolve(funcPath)
+                if not found and Fallbacks[funcPath] then
+                    for _, alt in ipairs(Fallbacks[funcPath]) do
+                        found = resolve(alt)
+                        if found then break end
+                    end
+                end
+                self.Supports[funcPath] = (found ~= nil)
+            end
+            if not self.Supports[funcPath] then
+                featureDisabled = true
+                if not seen[funcPath] then
+                    seen[funcPath] = true
+                    table.insert(missing, funcPath)
+                end
             end
         end
-        self.DisabledFeatures[feature] = isDisabled
+        self.DisabledFeatures[feature] = featureDisabled
+    end
+
+    if #missing > 0 then
+        task.spawn(function()
+            local elapsed = 0
+            while not _G.Library and elapsed < 10 do
+                task.wait(0.1); elapsed += 0.1
+            end
+            if _G.Library and type(_G.Library.Notify) == "function" then
+                _G.Library:Notify("Executor limited: " .. table.concat(missing, ", "), 6)
+            end
+        end)
     end
 
     return self.DisabledFeatures

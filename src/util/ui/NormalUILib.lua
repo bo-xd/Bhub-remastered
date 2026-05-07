@@ -160,6 +160,49 @@ local function ensureRootGui()
     return gui
 end
 
+local function showTip(anchor, text)
+    ensureRootGui()
+    if not Library._tooltip then
+        local f = Instance.new("Frame", Library.RootGui)
+        f.BackgroundColor3 = T().GroupBg
+        f.BorderSizePixel = 0
+        f.ZIndex = 999
+        f.AutomaticSize = Enum.AutomaticSize.X
+        f.Size = UDim2.new(0, 0, 0, 22)
+        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 4)
+        local stroke = Instance.new("UIStroke", f)
+        stroke.Color = T().GroupBorder
+        local pad = Instance.new("UIPadding", f)
+        pad.PaddingLeft = UDim.new(0, 6)
+        pad.PaddingRight = UDim.new(0, 6)
+        local lbl = Instance.new("TextLabel", f)
+        lbl.Name = "_tipLabel"
+        lbl.AutomaticSize = Enum.AutomaticSize.X
+        lbl.Size = UDim2.new(0, 0, 1, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextSize = 12
+        lbl.TextColor3 = T().Dim
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        Library._tooltip = f
+        th(function()
+            if f.Parent then
+                f.BackgroundColor3 = T().GroupBg
+                stroke.Color = T().GroupBorder
+                lbl.TextColor3 = T().Dim
+            end
+        end)
+    end
+    Library._tooltip._tipLabel.Text = text
+    local abs = anchor.AbsolutePosition
+    Library._tooltip.Position = UDim2.fromOffset(math.max(abs.X, 0), math.max(abs.Y - 26, 0))
+    Library._tooltip.Visible = true
+end
+
+local function hideTip()
+    if Library._tooltip then Library._tooltip.Visible = false end
+end
+
 function Library:GetThemeNames()
     local names = {}
     for n in pairs(Library.Themes) do
@@ -988,7 +1031,7 @@ function Library:CreateWindow(opts)
             local btn = Instance.new("TextButton")
             btn.Size = UDim2.new(1, -8, 0, 24)
             btn.Position = UDim2.new(0, 4, 0, 4)
-            btn.Text = disabled and (txt .. " (disabled)") or txt
+            btn.Text = txt
             btn.Font = Enum.Font.Gotham
             btn.TextSize = 14
             btn.TextColor3 = disabled and T().Dim or T().Text
@@ -1001,11 +1044,13 @@ function Library:CreateWindow(opts)
             corner.CornerRadius = UDim.new(0, 4)
             corner.Parent = btn
 
+            if disabled then
+                btn.MouseEnter:Connect(function() showTip(btn, "Incompatible") end)
+                btn.MouseLeave:Connect(hideTip)
+            end
+
             btn.Activated:Connect(function()
-                if disabled then
-                    pcall(function() Library:Notify('This feature is disabled by your executor.', 3) end)
-                    return
-                end
+                if disabled then return end
                 btn.BackgroundColor3 = T().Accent
                 pcall(fn)
                 task.delay(0.1, function()

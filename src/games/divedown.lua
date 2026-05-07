@@ -1,5 +1,5 @@
-return function(Window, ESP, Library, isFeatureDisabled)
-    isFeatureDisabled = isFeatureDisabled or function() return false end
+return function(Window, ESP, Library)
+    local Compat = getgenv().BHub_Compat
     local player = game:GetService("Players").LocalPlayer
     local RS = game:GetService("ReplicatedStorage")
     local CollectionService = game:GetService("CollectionService")
@@ -68,12 +68,14 @@ return function(Window, ESP, Library, isFeatureDisabled)
 
     local TeleportGroup = OceanTab:AddLeftGroupbox('Teleportation')
     local selectedAreaName = ZoneOrder[1]
+    
     TeleportGroup:AddDropdown('AreaSelector', { Values = ZoneOrder, Default = ZoneOrder[1], Multi = false, Text = 'Target Area', Callback = function(v) selectedAreaName = v end })
     TeleportGroup:AddButton({ Text = 'Teleport', Func = function() if HardcodedZones[selectedAreaName] then player.Character:PivotTo(CFrame.new(HardcodedZones[selectedAreaName])) end end })
     TeleportGroup:AddButton({ Text = 'Teleport Back (Aquarium)', Func = function() pcall(function() workspace.Network["Teleport-RemoteEvent"]:FireServer("Aquarium") end) end })
 
     local autoTPRareEnabled, lastTPTime = false, 0
     TeleportGroup:AddToggle('AutoTPRare', { Text = 'Auto TP to Rare Spawns', Default = false, Callback = function(v) autoTPRareEnabled = v end })
+
     pcall(function()
         game:GetService("TextChatService").MessageReceived:Connect(function(msg)
             if not autoTPRareEnabled or tick()-lastTPTime < 5 then return end
@@ -106,18 +108,30 @@ return function(Window, ESP, Library, isFeatureDisabled)
             end)
         end
     end })
+
     local ghostMode = false
     ProtectionGroup:AddToggle('GhostMode', { Text = 'Ghost Mode (Noclip)', Default = false, Callback = function(v) ghostMode = v end })
     task.spawn(function() game:GetService("RunService").Stepped:Connect(function() if ghostMode and player.Character then for _,v in pairs(player.Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide=false end end end end) end)
     ProtectionGroup:AddSlider('SwimSpeed', { Text = 'Swim Speed', Min = 1, Max = 100, Default = 1, Rounding = 1, Compact = false, Callback = function(v) workspace:SetAttribute("AdminSpeedMultiplier", v) end })
 
     local FarmGroup = AutofarmTab:AddLeftGroupbox('Farming')
+    local canFarm = Compat:CanUse("Proximity")
     local autofarmEnabled, mapVacuumEnabled, autoSellEnabled = false, false, false
     local mFilters, rFilters = {["Normal"]=true}, {["Normal"]=true}
     local selectedSpecificFish, targetFishInput = "Any", ""
 
     FarmGroup:AddToggle('MapVacuum', { Text = 'Map Vacuum (equip TNT)', Default = false, Callback = function(v) mapVacuumEnabled = v end })
-    FarmGroup:AddToggle('AutoFarm', { Text = 'Teleport Farm', Default = false, Callback = function(v) autofarmEnabled = v end })
+    FarmGroup:AddToggle('AutoFarm', { 
+        Text = 'Teleport Farm' .. (canFarm and "" or " [UNSUPPORTED]"), 
+        Default = false, 
+        Callback = function(v) 
+            if not canFarm then 
+                Library:Notify("Your executor lacks fireproximityprompt!") 
+                return 
+            end
+            autofarmEnabled = v 
+        end 
+    })
     FarmGroup:AddToggle('AutoSell', { Text = 'Auto Sell', Default = false, Callback = function(v) autoSellEnabled = v end })
 
     local FishDrop = FarmGroup:AddDropdown('TargetFish', { Values = {"Any"}, Default = "Any", Multi = false, Text = 'Specific Fish', Callback = function(v) selectedSpecificFish = v end })
@@ -126,6 +140,7 @@ return function(Window, ESP, Library, isFeatureDisabled)
         for _, v in pairs(Fish:GetChildren()) do if not table.find(list, v.Name) then table.insert(list, v.Name) end end
         FishDrop:SetValues(list)
     end })
+
     FarmGroup:AddInput('ManualFish', { Text = 'Manual Name Filter', Default = '', Callback = function(v) targetFishInput = v end })
 
     local FilterGroup = AutofarmTab:AddRightGroupbox('Filters')
@@ -151,7 +166,7 @@ return function(Window, ESP, Library, isFeatureDisabled)
     task.spawn(function()
         while true do
             task.wait(0.1)
-            if autofarmEnabled then
+            if autofarmEnabled and canFarm then
                 for _, v in pairs(Fish:GetChildren()) do
                     if not autofarmEnabled then break end
                     if v:IsA("Model") and v.Parent and not v:GetAttribute("Claimed") then
@@ -175,12 +190,26 @@ return function(Window, ESP, Library, isFeatureDisabled)
             end
         end
     end)
+
     task.spawn(function() while true do task.wait(2.5); if autoSellEnabled then RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\003\001")) end end end)
 
     local fishEspEnabled, areaEspEnabled = false, false
     local espMFilters, espRFilters = {["Normal"]=true}, {["Normal"]=true}
+    local canDraw = Compat:CanUse("DrawingAPI")
+    
     local EspMain = VisualsTab:AddLeftGroupbox('Fish ESP')
-    EspMain:AddToggle('FishEsp', { Text = 'Enable Fish ESP', Default = false, Callback = function(v) fishEspEnabled = v end })
+    EspMain:AddToggle('FishEsp', { 
+        Text = 'Enable Fish ESP' .. (canDraw and "" or " [UNSUPPORTED]"), 
+        Default = false, 
+        Callback = function(v) 
+            if not canDraw then 
+                Library:Notify("Your executor lacks the Drawing API!")
+                return 
+            end
+            fishEspEnabled = v 
+        end 
+    })
+
     EspMain:AddDropdown('EspMutF', { Values = MutationTypes, Default = {["Normal"]=true}, Multi = true, Text = 'ESP Mutation Filter', Callback = function(v) espMFilters = v end })
     EspMain:AddDropdown('EspRarF', { Values = {"Normal","Common","Rare","Epic","Legendary","Mythical","Secret","Divine"}, Default = {["Normal"]=true}, Multi = true, Text = 'ESP Rarity Filter', Callback = function(v) espRFilters = v end })
     VisualsTab:AddRightGroupbox('Area ESP'):AddToggle('AreaEsp', { Text = 'Enable Area ESP', Default = false, Callback = function(v) areaEspEnabled = v end })
@@ -188,7 +217,7 @@ return function(Window, ESP, Library, isFeatureDisabled)
     task.spawn(function()
         while true do
             task.wait(1)
-            if fishEspEnabled then
+            if fishEspEnabled and canDraw then
                 for _, f in pairs(Fish:GetChildren()) do
                     if f:IsA("Model") and f.Parent and not f:GetAttribute("Claimed") then
                         local m, r = getFishData(f)
@@ -224,7 +253,6 @@ return function(Window, ESP, Library, isFeatureDisabled)
     task.spawn(function()
         local function getVal(m)
             if not m then return 0 end
-
             if type(m.NextBloopSpawn) == "function" then
                 local ok, nextT = pcall(function() return m.NextBloopSpawn(os.time()) end)
                 if ok and type(nextT) == "number" then return nextT end
@@ -233,10 +261,8 @@ return function(Window, ESP, Library, isFeatureDisabled)
                 local ok, nextT = pcall(function() return m.NextMermaidSpawn(os.time()) end)
                 if ok and type(nextT) == "number" then return nextT end
             end
-
             return m.NextSpawn or m.SpawnTime or m.Time or m.time or 0
         end
-
         while true do
             task.wait(1)
             local bMod = RS.Modules:FindFirstChild("BloopSpawnSchedule")
@@ -262,12 +288,8 @@ return function(Window, ESP, Library, isFeatureDisabled)
                     local bTimeStr = (type(bNext) == "number") and os.date("%Y-%m-%d %H:%M:%S", bNext) or "N/A"
                     local mTimeStr = (type(mNext) == "number") and os.date("%Y-%m-%d %H:%M:%S", mNext) or "N/A"
                     TimerLabel:SetText(string.format("Bloop: %s (in %s)\nMermaid: %s (in %s)", bTimeStr, bRemStr, mTimeStr, mRemStr))
-                else
-                    TimerLabel:SetText("Searching for Schedule Modules...")
-                end
-            else
-                TimerLabel:SetText("Searching for Schedule Modules...")
-            end
+                else TimerLabel:SetText("Searching for Schedule Modules...") end
+            else TimerLabel:SetText("Searching for Schedule Modules...") end
         end
     end)
 
@@ -310,7 +332,6 @@ return function(Window, ESP, Library, isFeatureDisabled)
                 local pgui = player:WaitForChild("PlayerGui")
                 local ui = pgui:FindFirstChild("PersistentUI")
                 if not ui then return end
-
                 local function buyFromShop(shopKey, storeName)
                     local shops = ui:FindFirstChild("Shops")
                     if not shops then return end
@@ -318,23 +339,18 @@ return function(Window, ESP, Library, isFeatureDisabled)
                     local content = shop and shop:FindFirstChild("Content")
                     local scroll = content and content:FindFirstChild("ScrollingFrame")
                     if not scroll then return end
-
                     for _, itemFrame in pairs(scroll:GetChildren()) do
                         if itemFrame:IsA("Frame") or itemFrame:IsA("ImageButton") or itemFrame:IsA("TextButton") then
                             local slot = itemFrame:FindFirstChild("SlotTemplate")
                             local stockLabel = slot and slot:FindFirstChild("StockAmount")
                             local key = storeName..":"..tostring(itemFrame.Name)
-
                             if not knownEmpty[key] then
                                 if stockLabel and stockLabel:IsA("TextLabel") then
                                     local txt = tostring(stockLabel.Text or "")
                                     local stockNum = tonumber(txt:match("%d+")) or 0
-
-                                    if stockNum <= 0 then
-                                        knownEmpty[key] = true
+                                    if stockNum <= 0 then knownEmpty[key] = true
                                     else
                                         knownEmpty[key] = nil
-
                                         if not ((storeName == "Treat" and not autoShopTreats) or (storeName == "Tool" and not autoShopTools)) then
                                             local last = buyCache[key]
                                             if not (last and tick() - last < 30) then
@@ -348,7 +364,6 @@ return function(Window, ESP, Library, isFeatureDisabled)
                         end
                     end
                 end
-
                 if autoShopTreats then buyFromShop("Treat", "Treat") end
                 if autoShopTools then buyFromShop("Tool", "Tool") end
             end)
@@ -357,6 +372,7 @@ return function(Window, ESP, Library, isFeatureDisabled)
 
     local autoUpgradeEnabled = false
     MiscTab:AddRightGroupbox('Progression'):AddToggle('AutoUpgrade', { Text = 'Auto-Upgrade Gear', Default = false, Callback = function(v) autoUpgradeEnabled = v end })
+
     task.spawn(function()
         local Gear = require(RS.Modules.GearConfig)
         local Client = player.PlayerScripts:WaitForChild("Client")
@@ -375,24 +391,18 @@ return function(Window, ESP, Library, isFeatureDisabled)
     end)
 
     local AqGroup = AquariumTab:AddLeftGroupbox('Aquarium')
-
     local function equipBestFish()
         pcall(function()
             local netW = workspace:FindFirstChild("Network")
             if netW then
                 local remote = netW:FindFirstChild("RequestEquipBestFish-RemoteFunction") or netW:FindFirstChild("RequestEquipBestFish")
                 if remote then
-                    if remote:IsA("RemoteFunction") then
-                        remote:InvokeServer()
-                    elseif remote:IsA("RemoteEvent") then
-                        remote:FireServer()
-                    end
+                    if remote:IsA("RemoteFunction") then remote:InvokeServer()
+                    elseif remote:IsA("RemoteEvent") then remote:FireServer() end
                 end
             end
         end)
-        pcall(function()
-            require(player.PlayerScripts.Client).Network.Invoke("RequestEquipBestFish")
-        end)
+        pcall(function() require(player.PlayerScripts.Client).Network.Invoke("RequestEquipBestFish") end)
     end
 
     local autoEquipBest = false
@@ -402,9 +412,7 @@ return function(Window, ESP, Library, isFeatureDisabled)
     task.spawn(function()
         while true do
             task.wait(3)
-            if autoEquipBest then
-                equipBestFish()
-            end
+            if autoEquipBest then equipBestFish() end
         end
     end)
 
@@ -414,9 +422,7 @@ return function(Window, ESP, Library, isFeatureDisabled)
                 local bg = child:FindFirstChild("BillboardGui")
                 local frame = bg and bg:FindFirstChild("Frame")
                 local rarity = frame and frame:FindFirstChild("Rarity")
-                if rarity and rarity:IsA("TextLabel") then
-                    return rarity.Text:gsub("<[^>]+>", "")
-                end
+                if rarity and rarity:IsA("TextLabel") then return rarity.Text:gsub("<[^>]+>", "") end
             end
         end
         local fromName = tool.Name:match("%[(.-)%]")
@@ -430,9 +436,7 @@ return function(Window, ESP, Library, isFeatureDisabled)
             local current = type(k) == "number" and v or k
             if type(current) == "string" then
                 local active = (type(k) == "number") or (v == true)
-                if active and current:lower() == needle then
-                    return true
-                end
+                if active and current:lower() == needle then return true end
             end
         end
         return false
@@ -453,22 +457,14 @@ return function(Window, ESP, Library, isFeatureDisabled)
             if not char then return end
             tool.Parent = char
             task.wait(0.1)
-            RS:WaitForChild("Packets"):WaitForChild("Packet"):WaitForChild("RemoteEvent"):FireServer(
-                buffer.fromstring("\002\001\013"),
-                {player}
-            )
+            RS:WaitForChild("Packets"):WaitForChild("Packet"):WaitForChild("RemoteEvent"):FireServer(buffer.fromstring("\002\001\013"), {player})
         end)
     end
 
     local smartSellEnabled = false
     local smartSellRarities = {}
-    AqGroup:AddDropdown('SmartSellRarity', {
-        Values = {"Normal", "Common", "Rare", "Epic", "Legendary", "Mythical", "Secret", "Divine"},
-        Default = {},
-        Multi = true,
-        Text = 'Smart Sell Rarity'
-        ,Callback = function(v) smartSellRarities = v end
-    })
+
+    AqGroup:AddDropdown('SmartSellRarity', { Values = {"Normal", "Common", "Rare", "Epic", "Legendary", "Mythical", "Secret", "Divine"}, Default = {}, Multi = true, Text = 'Smart Sell Rarity', Callback = function(v) smartSellRarities = v end })
     AqGroup:AddToggle('SmartSellToggle', { Text = 'Smart Sell Fish', Default = false, Callback = function(v) smartSellEnabled = v end })
 
     task.spawn(function()

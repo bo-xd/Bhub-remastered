@@ -114,6 +114,23 @@ Library.AccentOverride = nil
 
 local baseTransMap = {}
 local notifyList = {}
+local _disabledHoverBtns = {}
+local _tipObjs = nil
+
+local function getTip()
+    if not _tipObjs then
+        local bg = Drawing.new("Square")
+        bg.Filled = true; bg.ZIndex = 99; bg.Rounding = 3; bg.Visible = false; bg.Transparency = 1
+        baseTransMap[bg] = 1
+        table.insert(Library.Drawings, bg)
+        local txt = Drawing.new("Text")
+        txt.Size = 12; txt.Font = FONT; txt.Outline = false; txt.ZIndex = 100; txt.Visible = false; txt.Transparency = 1
+        baseTransMap[txt] = 1
+        table.insert(Library.Drawings, txt)
+        _tipObjs = {bg = bg, txt = txt}
+    end
+    return _tipObjs
+end
 
 local function T()
     local theme = Library.Themes[Library.CurrentThemeName]
@@ -382,6 +399,29 @@ function Library:CreateCommandPalette(opts)
 end
 
 on(RunService.RenderStepped, function(dt)
+    local m = UserInputService:GetMouseLocation()
+    local hovering = false
+    for _, btn in ipairs(_disabledHoverBtns) do
+        if btn.isActive() and over(btn.bg.Position, btn.bg.Size) then
+            hovering = true
+            local tip = getTip()
+            tip.txt.Text = "Incompatible"
+            tip.txt.Color = T().Dim
+            tip.txt.Position = Vector2.new(m.X + 14, m.Y - 10)
+            tip.txt.Visible = true
+            local b = tip.txt.TextBounds
+            tip.bg.Color = T().GroupBg
+            tip.bg.Position = Vector2.new(m.X + 10, m.Y - 14)
+            tip.bg.Size = Vector2.new(b.X + 10, b.Y + 8)
+            tip.bg.Visible = true
+            break
+        end
+    end
+    if not hovering and _tipObjs then
+        _tipObjs.txt.Visible = false
+        _tipObjs.bg.Visible = false
+    end
+
     local vp = workspace.CurrentCamera.ViewportSize
     local currentY = vp.Y - 20
 
@@ -1030,7 +1070,7 @@ function Library:CreateWindow(opts)
             local iP  = Vector2.new()
             local isActive = false
             local bg2 = d("Square",{Size=Vector2.new(bW,24),Filled=true,ZIndex=20,Rounding=4,Color=(disabled and T().GroupBg or T().Btn),Visible=false})
-            local lt  = d("Text",  {Text=(disabled and (txt.." (disabled)") or txt),Size=14,Font=FONT,Outline=false,Center=true,Color=(disabled and T().Dim or T().Text),ZIndex=21,Visible=false})
+            local lt  = d("Text",  {Text=txt,Size=14,Font=FONT,Outline=false,Center=true,Color=(disabled and T().Dim or T().Text),ZIndex=21,Visible=false})
             th(function() if disabled then bg2.Color = T().GroupBg; lt.Color = T().Dim else bg2.Color = T().Btn; lt.Color = T().Text end end)
             local it = {h=32}
             function it.setVis(v) bg2.Visible=v; lt.Visible=v; isActive=v end
@@ -1042,11 +1082,17 @@ function Library:CreateWindow(opts)
                 if i.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
                 if Win.Active ~= parentTab or not isActive then return end
                 if over(bg2.Position, bg2.Size) then
-                    if disabled then pcall(function() Library:Notify('This feature is disabled by your executor.', 3) end); return end
+                    if disabled then return end
                     bg2.Color = T().Accent; if fn then fn() end
                     task.delay(0.13, function() pcall(function() bg2.Color = T().Btn end) end)
                 end
             end)
+            if disabled then
+                table.insert(_disabledHoverBtns, {
+                    bg = bg2,
+                    isActive = function() return isActive and Win.Visible end,
+                })
+            end
             addIt(it); return {}
         end
 
