@@ -1241,14 +1241,14 @@ function Library:CreateWindow(opts)
             arrow.TextColor3 = T().Dim
             arrow.Parent = btn
 
+            -- Floated to RootGui so it isn't clipped by the ScrollingFrame columns
             local list = Instance.new("ScrollingFrame")
-            list.Size = UDim2.new(1, -8, 0, 0)
-            list.Position = UDim2.new(0, 4, 1, 2)
             list.BackgroundColor3 = T().DropBg
             list.BorderSizePixel = 0
             list.Visible = false
             list.ScrollBarThickness = 4
-            list.Parent = row
+            list.ZIndex = 50
+            list.Parent = Library.RootGui
 
             local listCorner = Instance.new("UICorner")
             listCorner.CornerRadius = UDim.new(0, 4)
@@ -1264,31 +1264,46 @@ function Library:CreateWindow(opts)
 
             local open = false
 
+            local function calcH()
+                return math.min(#vals, 8) * 24 + 4
+            end
+
+            local function repositionList()
+                local absPos = btn.AbsolutePosition
+                local absSize = btn.AbsoluteSize
+                local h = calcH()
+                local screenH = workspace.CurrentCamera.ViewportSize.Y
+                local listY = (absPos.Y + absSize.Y + h < screenH - 10)
+                    and (absPos.Y + absSize.Y + 2)
+                    or  (absPos.Y - h - 2)
+                list.Position = UDim2.fromOffset(absPos.X, listY)
+                list.Size = UDim2.fromOffset(absSize.X, h)
+                list.CanvasSize = UDim2.new(0, 0, 0, #vals * 24)
+            end
+
             local function display()
                 if multi then
                     local picked = {}
                     for k, v in pairs(value or {}) do
-                        if v then
-                            picked[#picked + 1] = tostring(k)
-                        end
+                        if v then picked[#picked + 1] = tostring(k) end
                     end
                     table.sort(picked)
-                    if #picked == 0 then
-                        return "None"
-                    end
-                    if #picked <= 2 then
-                        return table.concat(picked, ", ")
-                    end
+                    if #picked == 0 then return "None" end
+                    if #picked <= 2 then return table.concat(picked, ", ") end
                     return picked[1] .. ", " .. picked[2] .. " +" .. tostring(#picked - 2)
                 end
                 return tostring(value or "None")
             end
 
+            local function closeList()
+                open = false
+                list.Visible = false
+                arrow.Text = "▾"
+            end
+
             local function rebuildList()
                 for _, c in ipairs(list:GetChildren()) do
-                    if c:IsA("TextButton") then
-                        c:Destroy()
-                    end
+                    if c:IsA("TextButton") then c:Destroy() end
                 end
 
                 for _, item in ipairs(vals) do
@@ -1303,46 +1318,59 @@ function Library:CreateWindow(opts)
                     rowBtn.TextColor3 = T().Text
                     rowBtn.BackgroundColor3 = isSel and T().DropSel or T().DropItem
                     rowBtn.BorderSizePixel = 0
+                    rowBtn.ZIndex = 51
                     rowBtn.Parent = list
 
                     local rowCorner = Instance.new("UICorner")
                     rowCorner.CornerRadius = UDim.new(0, 3)
                     rowCorner.Parent = rowBtn
 
+                    rowBtn.MouseEnter:Connect(function()
+                        rowBtn.BackgroundColor3 = T().DropHover
+                    end)
+                    rowBtn.MouseLeave:Connect(function()
+                        rowBtn.BackgroundColor3 = isSel and T().DropSel or T().DropItem
+                    end)
+
                     rowBtn.Activated:Connect(function()
                         if multi then
-                            if type(value) ~= "table" then
-                                value = {}
-                            end
+                            if type(value) ~= "table" then value = {} end
                             value[item] = not value[item] or nil
-                            if value[item] == false then
-                                value[item] = nil
-                            end
+                            if value[item] == false then value[item] = nil end
                         else
                             value = item
-                            open = false
-                            list.Visible = false
-                            list.Size = UDim2.new(1, -8, 0, 0)
+                            closeList()
                         end
                         valText.Text = display()
                         rebuildList()
-                        if o.Callback then
-                            o.Callback(value)
-                        end
+                        if o.Callback then o.Callback(value) end
                     end)
                 end
 
-                local h = math.min(#vals, 8) * 24 + 4
-                list.Size = open and UDim2.new(1, -8, 0, h) or UDim2.new(1, -8, 0, 0)
-                list.CanvasSize = UDim2.new(0, 0, 0, #vals * 24)
-                row.Size = UDim2.new(1, 0, 0, open and (56 + h) or 54)
+                if open then repositionList() end
             end
 
             btn.Activated:Connect(function()
                 open = not open
-                list.Visible = open
                 arrow.Text = open and "▴" or "▾"
-                rebuildList()
+                if open then
+                    repositionList()
+                    rebuildList()
+                    list.Visible = true
+                else
+                    closeList()
+                end
+            end)
+
+            -- Close when clicking outside both the button and list
+            UserInputService.InputBegan:Connect(function(input)
+                if not open or input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+                local m = UserInputService:GetMouseLocation()
+                local lp, ls = list.AbsolutePosition, list.AbsoluteSize
+                local bp, bs = btn.AbsolutePosition, btn.AbsoluteSize
+                local inList = m.X >= lp.X and m.X <= lp.X + ls.X and m.Y >= lp.Y and m.Y <= lp.Y + ls.Y
+                local inBtn  = m.X >= bp.X and m.X <= bp.X + bs.X and m.Y >= bp.Y and m.Y <= bp.Y + bs.Y
+                if not inList and not inBtn then closeList() end
             end)
 
             local api = {}
