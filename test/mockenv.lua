@@ -21,4 +21,4 @@ end
 
 MockEnvironment("LowTier")
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/YourRepo/src/util/ExecutorCompat.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/bo-xd/Bhub-remastered/main/src/util/ExecutorCompat.lua"))()
