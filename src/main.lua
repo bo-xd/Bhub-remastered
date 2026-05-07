@@ -170,7 +170,7 @@ if gamePath then
     Loader:SetStage('Preparing game module', 0.55)
     if gameScript then
         task.spawn(function()
-            local ok, err = pcall(function() gameScript(Window, ESP, Library) end)
+            local ok, err = pcall(function() gameScript(Window, ESP, Library, isFeatureDisabled) end)
             if not ok then
                 pcall(function()
                     if Library and type(Library.Notify) == "function" then
@@ -215,9 +215,9 @@ local function applyThemeByIndex(delta)
 end
 
 local EspGroup = Tabs.Universal:AddLeftGroupbox('Universal ESP')
-EspGroup:AddToggle('EspEnable',   { Text = 'Enable ESP',      Default = false, Callback = function(v) ESP.Enabled     = v end, Disabled = isFeatureDisabled('DrawingAPI') })
-EspGroup:AddToggle('EspBoxes',    { Text = 'Show Boxes',      Default = true,  Callback = function(v) ESP.ShowBoxes   = v end, Disabled = isFeatureDisabled('DrawingAPI') }):AddColorPicker('BoxColor',  { Default = Color3.new(1,1,1), Title = 'Box Color',  Callback = function(v) ESP.BoxColor  = v end })
-EspGroup:AddToggle('EspNames',    { Text = 'Show Names',      Default = true,  Callback = function(v) ESP.ShowNames   = v end, Disabled = isFeatureDisabled('DrawingAPI') }):AddColorPicker('TextColor', { Default = Color3.new(1,1,1), Title = 'Text Color', Callback = function(v) ESP.TextColor = v end })
+EspGroup:AddToggle('EspEnable',   { Text = 'Enable ESP',      Default = false, Callback = function(v) ESP.Enabled     = v end })
+EspGroup:AddToggle('EspBoxes',    { Text = 'Show Boxes',      Default = true,  Callback = function(v) ESP.ShowBoxes   = v end }):AddColorPicker('BoxColor',  { Default = Color3.new(1,1,1), Title = 'Box Color',  Callback = function(v) ESP.BoxColor  = v end })
+EspGroup:AddToggle('EspNames',    { Text = 'Show Names',      Default = true,  Callback = function(v) ESP.ShowNames   = v end }):AddColorPicker('TextColor', { Default = Color3.new(1,1,1), Title = 'Text Color', Callback = function(v) ESP.TextColor = v end })
 EspGroup:AddToggle('EspDistance', { Text = 'Show Distance',   Default = true,  Callback = function(v) ESP.ShowDistance = v end })
 EspGroup:AddToggle('EspHealth',   { Text = 'Show Health Bar', Default = true,  Callback = function(v) ESP.ShowHealth  = v end })
 EspGroup:AddToggle('EspTracers',  { Text = 'Show Tracers',    Default = false, Callback = function(v) ESP.ShowTracers = v end })

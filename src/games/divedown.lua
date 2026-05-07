@@ -1,4 +1,5 @@
-return function(Window, ESP, Library)
+return function(Window, ESP, Library, isFeatureDisabled)
+    isFeatureDisabled = isFeatureDisabled or function() return false end
     local player = game:GetService("Players").LocalPlayer
     local RS = game:GetService("ReplicatedStorage")
     local CollectionService = game:GetService("CollectionService")
