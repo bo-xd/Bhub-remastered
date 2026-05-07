@@ -13,19 +13,39 @@ local _handlers = {}
 local function resolveGlobal(name)
     local parts = {}
     for part in string.gmatch(name, "[^%.]+") do table.insert(parts, part) end
-    local val = _G
-    for i, part in ipairs(parts) do
-        if type(val) == "table" and val[part] ~= nil then
-            val = val[part]
-        else
-            if i == 1 and rawget(_G, part) ~= nil then
-                val = rawget(_G, part)
+
+    local function lookup(env)
+        local val = env
+        for i, part in ipairs(parts) do
+            if type(val) == "table" and val[part] ~= nil then
+                val = val[part]
             else
-                return nil
+                if i == 1 and type(env) == "table" and rawget(env, part) ~= nil then
+                    val = rawget(env, part)
+                else
+                    return nil
+                end
             end
         end
+        return val
     end
-    return val
+
+    local envs = { _G }
+    if type(getgenv) == "function" then
+        local ok, genv = pcall(getgenv)
+        if ok and type(genv) == "table" and genv ~= _G then
+            table.insert(envs, 1, genv)
+        end
+    end
+
+    for _, env in ipairs(envs) do
+        local val = lookup(env)
+        if val ~= nil then
+            return val
+        end
+    end
+
+    return nil
 end
 
 local names = {
@@ -179,7 +199,8 @@ end
 
 function Compat.RunChecks(options)
     options = options or {}
-    local notify = options.Notify ~= false
+    local showUI = options.ShowUI == true
+    local notify = (options.Notify ~= false) or showUI
     local notifyAll = options.NotifyAll == true
 
     local unsupported = {}
@@ -248,7 +269,7 @@ function Compat.RunChecks(options)
     for k, _ in pairs(now) do Compat._prevDisabled[k] = true end
 
     if notify and #unsupported > 0 then
-        if notifyAll then
+        if notifyAll and not showUI then
             for _, c in ipairs(unsupported) do
                 local m = ("Your executor doesn't support %s; some features may be limited or disabled."):format(c.label or c.id)
                 safeNotify("Executor incompatibility", m, 6)
@@ -272,7 +293,7 @@ function Compat.RunChecks(options)
     return Compat.Supports, Compat.DisabledFeatures
 end
 
-pcall(function() Compat.RunChecks({ Notify = true, NotifyAll = true }) end)
+pcall(function() Compat.RunChecks({ Notify = true, NotifyAll = false }) end)
 
 Compat.GetGuiParent = getGuiParent
 Compat.CanUseDrawing = function()
