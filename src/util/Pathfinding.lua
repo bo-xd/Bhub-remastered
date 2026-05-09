@@ -198,8 +198,10 @@ function Pathfinding:_showPathDrawing(waypoints, duration, options)
         line.Color = lineColor
         line.Thickness = lineThickness
 
-        line.From = camera:WorldToScreenPoint(wp1)
-        line.To = camera:WorldToScreenPoint(wp2)
+        local from = camera:WorldToScreenPoint(wp1)
+        local to = camera:WorldToScreenPoint(wp2)
+        line.From = Vector2.new(from.X, from.Y)
+        line.To = Vector2.new(to.X, to.Y)
         
         table.insert(drawings, {obj = line, type = "line", wp1 = wp1, wp2 = wp2})
     end
@@ -221,6 +223,7 @@ function Pathfinding:_showPathDrawing(waypoints, duration, options)
     
     local connection
     connection = RunService.RenderStepped:Connect(function()
+        if not connection then return end
         for _, drawing in ipairs(drawings) do
             if drawing.type == "line" then
                 local from = camera:WorldToScreenPoint(drawing.wp1)
@@ -235,7 +238,9 @@ function Pathfinding:_showPathDrawing(waypoints, duration, options)
     end)
 
     task.delay(duration, function()
-        connection:Disconnect()
+        if connection then
+            connection:Disconnect()
+        end
         for _, drawing in ipairs(drawings) do
             pcall(function()
                 drawing.obj:Remove()
