@@ -353,6 +353,8 @@ return function(Window, ESP, Library)
         end)
     end
 
+    local processed = {}
+
     local function buyFromShop(shopKey, storeName)
         local pgui = game.Players.LocalPlayer:FindFirstChild("PlayerGui")
         local shop = pgui and pgui:FindFirstChild("PersistentUI") 
@@ -367,13 +369,19 @@ return function(Window, ESP, Library)
         for _, itemFrame in pairs(scroll:GetChildren()) do
             if not (itemFrame:IsA("Frame") or itemFrame:IsA("ImageButton")) then continue end
             
+            local itemID = storeName .. ":" .. itemFrame.Name
+            
+            if processed[itemID] and tick() - processed[itemID] < 2 then 
+                continue 
+            end
+            
             local slot = itemFrame:FindFirstChild("SlotTemplate")
             local stockLabel = slot and slot:FindFirstChild("StockAmount")
             
             if stockLabel and stockLabel:IsA("TextLabel") then
                 local rawText = stockLabel.ContentText:upper()
                 
-                if rawText:find("NO") or rawText:find("0X") then 
+                if rawText:find("NO") or rawText:find("SOLD") or rawText:find("OUT") or rawText:find("0X") then 
                     continue 
                 end
 
@@ -385,13 +393,11 @@ return function(Window, ESP, Library)
                 if stockNum > 0 then
                     if rawText:match("^0") then continue end
 
-                    print(string.format("[BHub] Purchasing %s | Stock: %d", itemFrame.Name, stockNum))
-                    
+                    processed[itemID] = tick()
+
                     for i = 1, stockNum do
                         fireBuyItem(storeName, itemFrame.Name)
                     end
-                    
-                    task.wait(0.1) 
                 end
             end
         end
