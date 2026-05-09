@@ -353,7 +353,6 @@ return function(Window, ESP, Library)
         end)
     end
 
-
     local function buyFromShop(shopKey, storeName)
         local pgui = player:FindFirstChild("PlayerGui")
         local shop = pgui and pgui:FindFirstChild("PersistentUI") 
@@ -386,9 +385,11 @@ return function(Window, ESP, Library)
     end
 
     task.spawn(function()
-        while task.wait() do
+        while true do
             if autoShopTreats then buyFromShop("Treat", "Treat") end
             if autoShopTools then buyFromShop("Tool", "Tool") end
+
+            task.wait()
         end
     end)
 
