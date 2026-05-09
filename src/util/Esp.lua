@@ -136,11 +136,19 @@ local function makeTracer(parent)
 end
 
 local function newDrawing(class, props)
-    local d = Drawing.new(class)
-    for k, v in pairs(props) do
-        d[k] = v
+    local success, result = pcall(function()
+        local d = Drawing.new(class)
+        for k, v in pairs(props) do
+            d[k] = v
+        end
+        return d
+    end)
+
+    if success then
+        return result
+    else
+        return nil
     end
-    return d
 end
 
 local function createDrawingComponents(dataColor, dataName)
