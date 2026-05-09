@@ -76,15 +76,39 @@ return function(Window, ESP, Library)
     local autoTPRareEnabled, lastTPTime = false, 0
     TeleportGroup:AddToggle('AutoTPRare', { Text = 'Auto TP to Rare Spawns', Default = false, Callback = function(v) autoTPRareEnabled = v end })
 
-    pcall(function()
-        game:GetService("TextChatService").MessageReceived:Connect(function(msg)
-            if not autoTPRareEnabled or tick()-lastTPTime < 5 then return end
-            local m = msg.Text
-            if m:find("has spawned in") and (m:find("Secret") or m:find("Divine") or m:find("Mythical") or m:find("Legendary")) then
-                local zone = (m:match("has spawned in (%S+)") or ""):gsub("%p+$","")
-                if HardcodedZones[zone] then lastTPTime = tick(); player.Character:PivotTo(CFrame.new(HardcodedZones[zone])); Library:Notify("Auto-TP to rare spawn!") end
+    local function stripRichText(str)
+        return str:gsub("<[^>]+>", "")
+    end
+
+    game:GetService("TextChatService").MessageReceived:Connect(function(msg)
+        if not autoTPRareEnabled or (tick() - lastTPTime < 5) then return end
+
+        local cleanMsg = stripRichText(msg.Text)
+
+        local rarities = {"Secret", "Divine", "Mythical", "Legendary"}
+        local isRare = false
+        for _, rarity in ipairs(rarities) do
+            if cleanMsg:find(rarity) then
+                isRare = true
+                break
             end
-        end)
+        end
+
+        if cleanMsg:find("has spawned in") and isRare then
+            local zone = cleanMsg:match("has spawned in%s+(.+)$")
+            
+            if zone then
+                zone = zone:gsub("%p+$", ""):match("^%s*(.-)%s*$")
+                
+                if HardcodedZones[zone] then
+                    lastTPTime = tick()
+                    player.Character:PivotTo(CFrame.new(HardcodedZones[zone]))
+                    Library:Notify("Auto-TP to: " .. zone)
+                else
+                    warn("Zone found but not in HardcodedZones: " .. tostring(zone))
+                end
+            end
+        end
     end)
 
     local ProtectionGroup = OceanTab:AddRightGroupbox('Modifiers')
@@ -329,48 +353,42 @@ return function(Window, ESP, Library)
         end)
     end
 
-    task.spawn(function()
-        while true do
-            task.wait(3)
-            pcall(function()
-                local pgui = player:WaitForChild("PlayerGui")
-                local ui = pgui:FindFirstChild("PersistentUI")
-                if not ui then return end
-                local function buyFromShop(shopKey, storeName)
-                    local shops = ui:FindFirstChild("Shops")
-                    if not shops then return end
-                    local shop = shops:FindFirstChild(shopKey)
-                    local content = shop and shop:FindFirstChild("Content")
-                    local scroll = content and content:FindFirstChild("ScrollingFrame")
-                    if not scroll then return end
-                    for _, itemFrame in pairs(scroll:GetChildren()) do
-                        if itemFrame:IsA("Frame") or itemFrame:IsA("ImageButton") or itemFrame:IsA("TextButton") then
-                            local slot = itemFrame:FindFirstChild("SlotTemplate")
-                            local stockLabel = slot and slot:FindFirstChild("StockAmount")
-                            local key = storeName..":"..tostring(itemFrame.Name)
-                            if not knownEmpty[key] then
-                                if stockLabel and stockLabel:IsA("TextLabel") then
-                                    local txt = tostring(stockLabel.Text or "")
-                                    local stockNum = tonumber(txt:match("%d+")) or 0
-                                    if stockNum <= 0 then knownEmpty[key] = true
-                                    else
-                                        knownEmpty[key] = nil
-                                        if not ((storeName == "Treat" and not autoShopTreats) or (storeName == "Tool" and not autoShopTools)) then
-                                            local last = buyCache[key]
-                                            if not (last and tick() - last < 30) then
-                                                fireBuyItem(storeName, itemFrame.Name)
-                                                buyCache[key] = tick()
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
+
+    local function buyFromShop(shopKey, storeName)
+        local pgui = player:FindFirstChild("PlayerGui")
+        local shop = pgui and pgui:FindFirstChild("PersistentUI") 
+            and pgui.PersistentUI:FindFirstChild("Shops") 
+            and pgui.PersistentUI.Shops:FindFirstChild(shopKey)
+
+        if not shop then return end
+
+        local scroll = shop:FindFirstChild("Content") and shop.Content:FindFirstChild("ScrollingFrame")
+        if not scroll then return end
+
+        for _, itemFrame in pairs(scroll:GetChildren()) do
+            if not (itemFrame:IsA("Frame") or itemFrame:IsA("ImageButton")) then continue end
+            
+            local slot = itemFrame:FindFirstChild("SlotTemplate")
+            local stockLabel = slot and slot:FindFirstChild("StockAmount")
+            
+            if stockLabel and stockLabel:IsA("TextLabel") then
+                local stockNum = tonumber(stockLabel.Text:match("%d+")) or 0
+
+                if stockNum > 0 then
+                    for i = 1, stockNum do
+                        fireBuyItem(storeName, itemFrame.Name)
                     end
+
+                    Library:Notify("Instantly cleared " .. stockNum .. "x " .. itemFrame.Name)
                 end
-                if autoShopTreats then buyFromShop("Treat", "Treat") end
-                if autoShopTools then buyFromShop("Tool", "Tool") end
-            end)
+            end
+        end
+    end
+
+    task.spawn(function()
+        while task.wait() do
+            if autoShopTreats then buyFromShop("Treat", "Treat") end
+            if autoShopTools then buyFromShop("Tool", "Tool") end
         end
     end)
 
