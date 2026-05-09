@@ -163,4 +163,142 @@ function Pathfinding:FollowPath(character, waypoints, options)
     return true
 end
 
+function Pathfinding:ShowPath(waypoints, duration, options)
+    duration = duration or 10
+    options = options or {}
+    
+    local drawingAvailable = pcall(function() 
+        return Drawing ~= nil
+    end)
+    
+    if drawingAvailable and Drawing then
+        return self:_showPathDrawing(waypoints, duration, options)
+    else
+        return self:_showPathParts(waypoints, duration, options)
+    end
+end
+
+function Pathfinding:_showPathDrawing(waypoints, duration, options)
+    local drawings = {}
+    
+    local lineColor = options.LineColor or Color3.fromRGB(0, 255, 0)
+    local startColor = options.StartColor or Color3.fromRGB(0, 255, 0)
+    local endColor = options.EndColor or Color3.fromRGB(255, 0, 0)
+    local waypointColor = options.WaypointColor or Color3.fromRGB(100, 149, 237)
+    local lineThickness = options.LineThickness or 2
+    
+    local camera = workspace.CurrentCamera
+
+    for i = 1, #waypoints - 1 do
+        local wp1 = waypoints[i].Position
+        local wp2 = waypoints[i + 1].Position
+        
+        local line = Drawing.new("Line")
+        line.Visible = true
+        line.Color = lineColor
+        line.Thickness = lineThickness
+
+        line.From = camera:WorldToScreenPoint(wp1)
+        line.To = camera:WorldToScreenPoint(wp2)
+        
+        table.insert(drawings, {obj = line, type = "line", wp1 = wp1, wp2 = wp2})
+    end
+
+    for i, wp in ipairs(waypoints) do
+        local color = i == 1 and startColor or (i == #waypoints and endColor or waypointColor)
+        
+        local circle = Drawing.new("Circle")
+        circle.Visible = true
+        circle.Color = color
+        circle.Filled = true
+        circle.Radius = 8
+        
+        local screenPos = camera:WorldToScreenPoint(wp.Position)
+        circle.Position = Vector2.new(screenPos.X, screenPos.Y)
+        
+        table.insert(drawings, {obj = circle, type = "circle", pos = wp.Position})
+    end
+    
+    local connection
+    connection = RunService.RenderStepped:Connect(function()
+        for _, drawing in ipairs(drawings) do
+            if drawing.type == "line" then
+                local from = camera:WorldToScreenPoint(drawing.wp1)
+                local to = camera:WorldToScreenPoint(drawing.wp2)
+                drawing.obj.From = Vector2.new(from.X, from.Y)
+                drawing.obj.To = Vector2.new(to.X, to.Y)
+            elseif drawing.type == "circle" then
+                local screenPos = camera:WorldToScreenPoint(drawing.pos)
+                drawing.obj.Position = Vector2.new(screenPos.X, screenPos.Y)
+            end
+        end
+    end)
+
+    task.delay(duration, function()
+        connection:Disconnect()
+        for _, drawing in ipairs(drawings) do
+            pcall(function()
+                drawing.obj:Remove()
+            end)
+        end
+    end)
+    
+    return {Type = "Drawing", Count = #drawings}
+end
+
+function Pathfinding:_showPathParts(waypoints, duration, options)
+    local lineColor = options.LineColor or Color3.fromRGB(0, 255, 0)
+    local startColor = options.StartColor or Color3.fromRGB(0, 255, 0)
+    local endColor = options.EndColor or Color3.fromRGB(255, 0, 0)
+    local waypointColor = options.WaypointColor or Color3.fromRGB(100, 149, 237)
+    
+    local folder = Instance.new("Folder")
+    folder.Name = "PathVisualization"
+    folder.Parent = workspace
+    
+    -- Draw lines between consecutive waypoints
+    for i = 1, #waypoints - 1 do
+        local wp1 = waypoints[i].Position
+        local wp2 = waypoints[i + 1].Position
+        
+        local direction = (wp2 - wp1)
+        local distance = direction.Magnitude
+        local midpoint = (wp1 + wp2) / 2
+        
+        local line = Instance.new("Part")
+        line.Name = "PathLine_" .. i
+        line.Shape = Enum.PartType.Cylinder
+        line.Material = Enum.Material.Neon
+        line.Color = lineColor
+        line.CanCollide = false
+        line.CFrame = CFrame.new(midpoint, wp2)
+        line.Size = Vector3.new(0.2, distance, 0.2)
+        line.Parent = folder
+    end
+    
+    -- Mark waypoints with small spheres
+    for i, wp in ipairs(waypoints) do
+        local color = i == 1 and startColor or (i == #waypoints and endColor or waypointColor)
+        
+        local marker = Instance.new("Part")
+        marker.Name = "Waypoint_" .. i
+        marker.Shape = Enum.PartType.Ball
+        marker.Material = Enum.Material.Neon
+        marker.Color = color
+        marker.CanCollide = false
+        marker.Size = Vector3.new(0.6, 0.6, 0.6)
+        marker.Position = wp.Position + Vector3.new(0, 2, 0)
+        marker.Parent = folder
+    end
+    
+    -- Clean up after duration
+    task.delay(duration, function()
+        if folder and folder.Parent then
+            folder:Destroy()
+        end
+    end)
+    
+    return {Type = "Parts", Count = #waypoints}
+end
+
 return Pathfinding
