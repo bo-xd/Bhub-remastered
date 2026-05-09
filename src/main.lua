@@ -59,63 +59,51 @@ local function safeRequest(url)
     return { Success = false, Body = nil }
 end
 
-local function ensureLocalFolderFor(path)
-    if type(isfolder) ~= "function" or type(makefolder) ~= "function" then return end
-    local parts = {}
-    for part in string.gmatch(path, "[^/]+") do table.insert(parts, part) end
-    local cur = ""
-    for i = 1, #parts - 1 do
-        cur = (cur == "") and parts[i] or (cur .. "/" .. parts[i])
-        if not isfolder(cur) then
-            pcall(function() makefolder(cur) end)
-        end
-    end
-end
-
-local function saveToLocal(path, content)
-    if type(writefile) ~= "function" then return end
+local function updateLocalBackup(path, content)
+    if type(writefile) ~= "function" or type(makefolder) ~= "function" then return end
+    
     pcall(function()
-        ensureLocalFolderFor(path)
-        writefile(path, content)
+        if type(isfolder) == "function" and not isfolder("Bhub-remastered") then
+            makefolder("Bhub-remastered")
+        end
+
+        local localPath = "Bhub-remastered/" .. path
+        writefile(localPath, content)
     end)
 end
 
 local function loadFile(path)
+    local url = string.format("https://raw.githubusercontent.com/%s/%s/%s", REPO, BRANCH, path)
+    local resp = safeRequest(url)
+    
+    if resp and resp.Success and resp.Body and resp.Body ~= "" then
+        local res, err = compileAndRun(resp.Body)
+        
+        if res ~= nil then
+            updateLocalBackup(path, resp.Body)
+            return res
+        else
+            warn("[BHub] Remote code for " .. path .. " has syntax errors: " .. tostring(err))
+        end
+    else
+        warn("[BHub] Could not reach GitHub. Attempting to load local backup for: " .. path)
+    end
+
     if type(isfile) == "function" and type(readfile) == "function" then
         local localPath = "Bhub-remastered/" .. path
+        
         local ok_exists, exists = pcall(function() return isfile(localPath) end)
         if ok_exists and exists then
-            local ok_run, res_or_err = pcall(function()
-                local src = readfile(localPath)
-                local r, e = compileAndRun(src)
-                if r ~= nil then return r end
-                error(tostring(e))
-            end)
-            if ok_run then
-                return res_or_err
-            else
-                warn("[BHub] local module failed to load: " .. tostring(res_or_err))
+            local src = readfile(localPath)
+            local res, err = compileAndRun(src)
+            
+            if res ~= nil then
+                return res
             end
         end
     end
 
-    local url = string.format("https://raw.githubusercontent.com/%s/%s/%s", REPO, BRANCH, path)
-    local resp = safeRequest(url)
-    if resp and resp.Success and resp.Body and resp.Body ~= "" then
-        local res, err = compileAndRun(resp.Body)
-        if res ~= nil then
-            pcall(function()
-                local localPath = "Bhub-remastered/" .. path
-                saveToLocal(localPath, resp.Body)
-            end)
-            return res
-        else
-            warn("[BHub] remote module compiled but errored at runtime: " .. tostring(err))
-        end
-    else
-        warn("[BHub] failed to fetch remote module: " .. tostring(path))
-    end
-
+    warn("[BHub] Critical Error: Could not load " .. path .. " from Remote OR Local.")
     return nil
 end
 

@@ -353,45 +353,51 @@ return function(Window, ESP, Library)
         end)
     end
 
-    local function buyFromShop(shopKey, storeName)
-        local pgui = player:FindFirstChild("PlayerGui")
-        local shop = pgui and pgui:FindFirstChild("PersistentUI") 
-            and pgui.PersistentUI:FindFirstChild("Shops") 
-            and pgui.PersistentUI.Shops:FindFirstChild(shopKey)
+local function buyFromShop(shopKey, storeName)
+    local pgui = player:FindFirstChild("PlayerGui")
+    local shop = pgui and pgui:FindFirstChild("PersistentUI") 
+        and pgui.PersistentUI:FindFirstChild("Shops") 
+        and pgui.PersistentUI.Shops:FindFirstChild(shopKey)
 
-        if not shop then return end
+    if not shop then return end
 
-        local scroll = shop:FindFirstChild("Content") and shop.Content:FindFirstChild("ScrollingFrame")
-        if not scroll then return end
+    local scroll = shop:FindFirstChild("Content") and shop.Content:FindFirstChild("ScrollingFrame")
+    if not scroll then return end
 
-        for _, itemFrame in pairs(scroll:GetChildren()) do
-            if not (itemFrame:IsA("Frame") or itemFrame:IsA("ImageButton")) then continue end
+    for _, itemFrame in pairs(scroll:GetChildren()) do
+        if not (itemFrame:IsA("Frame") or itemFrame:IsA("ImageButton")) then continue end
+        
+        local slot = itemFrame:FindFirstChild("SlotTemplate")
+        local stockLabel = slot and slot:FindFirstChild("StockAmount")
+        
+        if stockLabel and stockLabel:IsA("TextLabel") then
+            local rawText = stockLabel.ContentText:upper() 
             
-            local slot = itemFrame:FindFirstChild("SlotTemplate")
-            local stockLabel = slot and slot:FindFirstChild("StockAmount")
-            
-            if stockLabel and stockLabel:IsA("TextLabel") then
-                local stockNum = tonumber(stockLabel.Text:match("%d+")) or 0
+            if rawText:find("NO STOCK")then 
+                continue 
+            end
 
-                if stockNum > 0 then
-                    for i = 1, stockNum do
-                        fireBuyItem(storeName, itemFrame.Name)
-                    end
-
-                    Library:Notify("Instantly cleared " .. stockNum .. "x " .. itemFrame.Name)
+            local stockNum = tonumber(rawText:match("%d+")) or 0
+            if stockNum > 0 then
+                print(string.format("[SHOP] Buying %s | Detected Stock: %d", itemFrame.Name, stockNum))
+                
+                for i = 1, stockNum do
+                    fireBuyItem(storeName, itemFrame.Name)
                 end
+                
+                task.wait(0.1) 
             end
         end
     end
+end
 
-    task.spawn(function()
-        while true do
-            if autoShopTreats then buyFromShop("Treat", "Treat") end
-            if autoShopTools then buyFromShop("Tool", "Tool") end
-
-            task.wait()
-        end
-    end)
+task.spawn(function()
+    while true do
+        if autoShopTreats then buyFromShop("Treat", "Treat") end
+        if autoShopTools then buyFromShop("Tool", "Tool") end
+        task.wait(1)
+    end
+end)
 
     local autoUpgradeEnabled = false
     MiscTab:AddRightGroupbox('Progression'):AddToggle('AutoUpgrade', { Text = 'Auto-Upgrade Gear', Default = false, Callback = function(v) autoUpgradeEnabled = v end })
