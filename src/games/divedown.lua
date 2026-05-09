@@ -354,7 +354,7 @@ return function(Window, ESP, Library)
     end
 
     local function buyFromShop(shopKey, storeName)
-        local pgui = player:FindFirstChild("PlayerGui")
+        local pgui = game.Players.LocalPlayer:FindFirstChild("PlayerGui")
         local shop = pgui and pgui:FindFirstChild("PersistentUI") 
             and pgui.PersistentUI:FindFirstChild("Shops") 
             and pgui.PersistentUI.Shops:FindFirstChild(shopKey)
@@ -371,25 +371,27 @@ return function(Window, ESP, Library)
             local stockLabel = slot and slot:FindFirstChild("StockAmount")
             
             if stockLabel and stockLabel:IsA("TextLabel") then
-                local rawText = stockLabel.ContentText:upper() 
-
-                if rawText:find("NO") or rawText:find("SOLD") or rawText:find("EMPTY") then 
+                local rawText = stockLabel.ContentText:upper()
+                
+                if rawText:find("NO") or rawText:find("STOCK") then 
                     continue 
                 end
 
-                local stockNum = tonumber(rawText:match("STOCK%s*:%s*(%d+)")) or tonumber(rawText:match("(%d+)")) or 0
+                local stockNum = tonumber(rawText:match("STOCK%s*[:%-]?%s*(%d+)")) 
+                    or tonumber(rawText:match("(%d+)"))
+                    or 0
 
-                if stockNum <= 0 then
-                    continue
-                end
+                if stockNum > 0 then
+                    if rawText:match("^0") or rawText:match("/0") then continue end
 
-                print("[SHOP] Buying " .. itemFrame.Name .. " | Stock: " .. stockNum)
-                
-                for i = 1, stockNum do
-                    fireBuyItem(storeName, itemFrame.Name)
+                    print("[SHOP] Buying Rare/Stocked Item: " .. itemFrame.Name .. " | Amount: " .. stockNum)
+                    
+                    for i = 1, stockNum do
+                        fireBuyItem(storeName, itemFrame.Name)
+                    end
+                    
+                    task.wait(0.1) 
                 end
-                
-                task.wait(0.1) 
             end
         end
     end
