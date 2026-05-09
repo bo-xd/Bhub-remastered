@@ -137,7 +137,11 @@ return function(Window, ESP, Library)
     local FishDrop = FarmGroup:AddDropdown('TargetFish', { Values = {"Any"}, Default = "Any", Multi = false, Text = 'Specific Fish', Callback = function(v) selectedSpecificFish = v end })
     FarmGroup:AddButton({ Text = 'Refresh Fish List', Func = function()
         local list = {"Any"}
-        for _, v in pairs(Fish:GetChildren()) do if not table.find(list, v.Name) then table.insert(list, v.Name) end end
+        for _, v in pairs(Fish:GetChildren()) do 
+            if not table.find(list, v.Name) and not v:GetAttribute("AgeYears") then 
+                table.insert(list, v.Name) 
+            end 
+        end
         FishDrop:SetValues(list)
     end })
 
@@ -219,7 +223,7 @@ return function(Window, ESP, Library)
             task.wait(1)
             if fishEspEnabled and canDraw then
                 for _, f in pairs(Fish:GetChildren()) do
-                    if f:IsA("Model") and f.Parent and not f:GetAttribute("Claimed") then
+                    if f:IsA("Model") and f.Parent and not f:GetAttribute("AgeYears") then
                         local m, r = getFishData(f)
                         if checkFilters(m, r, espMFilters, espRFilters) then
                             if not ESP.Objects[f] then ESP:Add(f, { Name = f.Name .. " [" .. m .. "]", Color = Color3.fromRGB(255, 255, 255), IsEnabled = function() return fishEspEnabled and f.Parent ~= nil end }) end
