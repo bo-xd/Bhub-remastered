@@ -373,18 +373,19 @@ return function(Window, ESP, Library)
             if stockLabel and stockLabel:IsA("TextLabel") then
                 local rawText = stockLabel.ContentText:upper()
                 
-                if rawText:find("NO") or rawText:find("STOCK") then 
+                if rawText:find("NO") or rawText:find("0X") then 
                     continue 
                 end
 
-                local stockNum = tonumber(rawText:match("STOCK%s*[:%-]?%s*(%d+)")) 
-                    or tonumber(rawText:match("(%d+)"))
+                local stockNum = tonumber(rawText:match("(%d+)%s*X")) 
+                    or tonumber(rawText:match("STOCK%s*[:%-]?%s*(%d+)")) 
+                    or tonumber(rawText:match("(%d+)")) 
                     or 0
 
                 if stockNum > 0 then
-                    if rawText:match("^0") or rawText:match("/0") then continue end
+                    if rawText:match("^0") then continue end
 
-                    print("[SHOP] Buying Rare/Stocked Item: " .. itemFrame.Name .. " | Amount: " .. stockNum)
+                    print(string.format("[BHub] Purchasing %s | Stock: %d", itemFrame.Name, stockNum))
                     
                     for i = 1, stockNum do
                         fireBuyItem(storeName, itemFrame.Name)
