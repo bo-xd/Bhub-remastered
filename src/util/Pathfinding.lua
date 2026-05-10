@@ -198,10 +198,8 @@ function Pathfinding:_showPathDrawing(waypoints, duration, options)
         line.Color = lineColor
         line.Thickness = lineThickness
 
-        local from = camera:WorldToScreenPoint(wp1)
-        local to = camera:WorldToScreenPoint(wp2)
-        line.From = Vector2.new(from.X, from.Y)
-        line.To = Vector2.new(to.X, to.Y)
+        line.From = camera:WorldToScreenPoint(wp1)
+        line.To = camera:WorldToScreenPoint(wp2)
         
         table.insert(drawings, {obj = line, type = "line", wp1 = wp1, wp2 = wp2})
     end
@@ -223,7 +221,6 @@ function Pathfinding:_showPathDrawing(waypoints, duration, options)
     
     local connection
     connection = RunService.RenderStepped:Connect(function()
-        if not connection then return end
         for _, drawing in ipairs(drawings) do
             if drawing.type == "line" then
                 local from = camera:WorldToScreenPoint(drawing.wp1)
@@ -238,9 +235,7 @@ function Pathfinding:_showPathDrawing(waypoints, duration, options)
     end)
 
     task.delay(duration, function()
-        if connection then
-            connection:Disconnect()
-        end
+        connection:Disconnect()
         for _, drawing in ipairs(drawings) do
             pcall(function()
                 drawing.obj:Remove()
@@ -281,7 +276,6 @@ function Pathfinding:_showPathParts(waypoints, duration, options)
         line.Parent = folder
     end
     
-    -- Mark waypoints with small spheres
     for i, wp in ipairs(waypoints) do
         local color = i == 1 and startColor or (i == #waypoints and endColor or waypointColor)
         
@@ -295,8 +289,7 @@ function Pathfinding:_showPathParts(waypoints, duration, options)
         marker.Position = wp.Position + Vector3.new(0, 2, 0)
         marker.Parent = folder
     end
-    
-    -- Clean up after duration
+
     task.delay(duration, function()
         if folder and folder.Parent then
             folder:Destroy()

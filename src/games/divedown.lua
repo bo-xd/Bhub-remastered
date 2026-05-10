@@ -14,7 +14,7 @@ return function(Window, ESP, Library)
     local Fish        = game_folder:WaitForChild("Fishes")
     local Markers     = game_folder:WaitForChild("OceanZoneMarkers")
 
-    local MutationTypes = {"Normal","Silver","Gold","Rainbow","Frozen","Shocked","Magma","Chocolate","Dry","Infected","Evil","YinYang","Hacker","Galaxy","Taco"}
+    local MutationTypes = {"Normal","Silver","Gold","Rainbow"}
     local ZoneOrder = {"SunlightZone","Area1","Area2","CoralReef","TwilightZone","Area3","DeepOcean","TheDeepDark","TheTrenches","Atlantis","AquaForest","ShellReef","KrakenWorld","MegalodonsLair","IceArea","JellyfishFields","SteampunkZone","DeadWaters","Prehistoric"}
     local HardcodedZones = {
         ["SunlightZone"]   = Vector3.new(-1935.5, 2466.8, -1420.5),
@@ -55,6 +55,7 @@ return function(Window, ESP, Library)
     end
 
     local function checkFilters(mut, rar, mFilters, rFilters)
+        if rebirthFarming then return true end
         local mCount, rCount = 0, 0
         if mFilters then for _, v in pairs(mFilters) do if v then mCount=mCount+1 end end end
         if rFilters then for _, v in pairs(rFilters) do if v then rCount=rCount+1 end end end
@@ -143,6 +144,7 @@ return function(Window, ESP, Library)
     local autofarmEnabled, mapVacuumEnabled, autoSellEnabled = false, false, false
     local mFilters, rFilters = {["Normal"]=true}, {["Normal"]=true}
     local selectedSpecificFish, targetFishInput = "Any", ""
+    local rebirthFarming, rebirthTargetFish = false, ""
 
     FarmGroup:AddToggle('MapVacuum', { Text = 'Map Vacuum (equip TNT)', Default = false, Callback = function(v) mapVacuumEnabled = v end })
     FarmGroup:AddToggle('AutoFarm', { 
@@ -163,7 +165,7 @@ return function(Window, ESP, Library)
         local list = {"Any"}
         for _, v in pairs(Fish:GetChildren()) do 
             if not table.find(list, v.Name) and not v:GetAttribute("AgeYears") then 
-                table.insert(list, v.Name) 
+                table.insert(list, v.Name)  
             end 
         end
         FishDrop:SetValues(list)
@@ -194,11 +196,11 @@ return function(Window, ESP, Library)
     task.spawn(function()
         while true do
             task.wait(0.1)
-            if autofarmEnabled and canFarm then
+            if (autofarmEnabled or rebirthFarming) and canFarm then
                 for _, v in pairs(Fish:GetChildren()) do
-                    if not autofarmEnabled then break end
+                    if not (autofarmEnabled or rebirthFarming) then break end
                     if v:IsA("Model") and v.Parent and not v:GetAttribute("Claimed") then
-                        local match = (selectedSpecificFish == "Any") or (v.Name == selectedSpecificFish) or (targetFishInput ~= "" and v.Name:lower():find(targetFishInput:lower()))
+                        local match = (selectedSpecificFish == "Any") or (v.Name == selectedSpecificFish) or (targetFishInput ~= "" and v.Name:lower():find(targetFishInput:lower())) or (rebirthFarming and v.Name == rebirthTargetFish)
                         if match then
                             local m, r = getFishData(v)
                             if checkFilters(m, r, mFilters, rFilters) then
@@ -208,7 +210,7 @@ return function(Window, ESP, Library)
                                     p.HoldDuration = 0; p.MaxActivationDistance = 9e9; p.Enabled = true
                                     player.Character.HumanoidRootPart.CFrame = v:GetPivot() * CFrame.new(0, 3, 0)
                                     task.wait(0.2)
-                                    if autofarmEnabled then fireproximityprompt(p) end
+                                    if autofarmEnabled or rebirthFarming then fireproximityprompt(p) end
                                     task.wait(0.2)
                                 end
                             end
@@ -411,8 +413,10 @@ return function(Window, ESP, Library)
         end
     end)
 
-    local autoUpgradeEnabled = false
-    MiscTab:AddRightGroupbox('Progression'):AddToggle('AutoUpgrade', { Text = 'Auto-Upgrade Gear', Default = false, Callback = function(v) autoUpgradeEnabled = v end })
+    local autoUpgradeEnabled, autoRebirthEnabled = false, false
+    local ProgressionGroup = MiscTab:AddRightGroupbox('Progression')
+    ProgressionGroup:AddToggle('AutoUpgrade', { Text = 'Auto-Upgrade Gear', Default = false, Callback = function(v) autoUpgradeEnabled = v end })
+    ProgressionGroup:AddToggle('AutoRebirth', { Text = 'Auto Rebirth', Default = false, Callback = function(v) autoRebirthEnabled = v end })
 
     task.spawn(function()
         local Gear = require(RS.Modules.GearConfig)
@@ -427,6 +431,60 @@ return function(Window, ESP, Library)
                         if data.price and data.price <= cash then pcall(function() Net.Invoke("BuyItem", cat, itemName) end) end
                     end
                 end
+            end
+        end
+    end)
+
+    task.spawn(function()
+        local RebirthConfig = require(game:GetService("ReplicatedStorage").Shared.Dir.RebirthConfig)
+        while true do
+            task.wait(5)
+            if autoRebirthEnabled then
+                local currentRebirth = player:GetAttribute("RebirthLevel") or 0
+                local nextLevel = currentRebirth + 1
+                local config = RebirthConfig[nextLevel]
+                if not config then 
+                    rebirthFarming = false
+                    continue 
+                end
+                local cash = player:GetAttribute("Cash") or 0
+                if cash < config.Requirements.Cash then 
+                    rebirthFarming = false
+                    continue 
+                end
+
+                local fishCounts = {}
+                local bf = player:FindFirstChild("BackpackFish")
+                if bf then
+                    for _, f in pairs(bf:GetChildren()) do
+                        fishCounts[f.Name] = (fishCounts[f.Name] or 0) + 1
+                    end
+                end
+                local hasAllFish = true
+                local missingFish = nil
+                for _, req in pairs(config.Requirements.Fish) do
+                    if (fishCounts[req.Name] or 0) < req.Amount then
+                        hasAllFish = false
+                        missingFish = req.Name
+                        break
+                    end
+                end
+                if hasAllFish then
+                    rebirthFarming = false
+                    -- perform rebirth
+                    RS.Packets.Packet.RemoteEvent:FireServer(buffer.fromstring("\001"))
+                    Library:Notify("Auto Rebirth: Rebirthing to level " .. nextLevel)
+                else
+                    if missingFish and canFarm then
+                        rebirthFarming = true
+                        rebirthTargetFish = missingFish
+                        Library:Notify("Auto Rebirth: Farming required fish: " .. missingFish)
+                    else
+                        rebirthFarming = false
+                    end
+                end
+            else
+                rebirthFarming = false
             end
         end
     end)
